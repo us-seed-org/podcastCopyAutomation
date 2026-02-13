@@ -12,6 +12,76 @@ export async function POST(request: Request) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Skip research for episodes with no meaningful guest
+    const noGuestPatterns = [
+      "no guest",
+      "there is no guest",
+      "no external guest",
+      "hosts only",
+      "host-only",
+      "solo episode"
+    ];
+    const hasNoGuest = noGuestPatterns.some(pattern =>
+      guestName.toLowerCase().includes(pattern)
+    );
+
+    if (hasNoGuest) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "status", message: "No external guest - using topic-based generation..." })}\n\n`)
+          );
+
+          // Return minimal research object for no-guest episodes
+          const noGuestResearch = {
+            guest: {
+              name: guestName,
+              bio: "This episode has no external guest. Content is driven by hosts' discussion and transcript topics.",
+              credentials: [],
+              socialPresence: "N/A - no external guest",
+              controversies: "None",
+              authorityLabel: "N/A",
+              guestTier: {
+                tier: 3,
+                reasoning: "No external guest - episode is topic-driven",
+                youtubeRecommendation: "TOPIC-ONLY, drop guest from YouTube title"
+              }
+            },
+            brand: {
+              podcastName: podcastName,
+              titleFormat: "Topic-driven episodes",
+              voiceDescription: "Based on transcript content",
+              audienceProfile: "General audience interested in discussed topics"
+            },
+            transcript: {
+              topClaims: [],
+              specificNumbers: [],
+              emotionalMoments: [],
+              clickableMoment: "",
+              topicSegments: [],
+              trendingKeywords: []
+            },
+            trendingTopics: [],
+            searchQueriesUsed: []
+          };
+
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "complete", data: noGuestResearch })}\n\n`)
+          );
+          controller.close();
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
     const systemPrompt = buildResearchSystemPrompt();
     const userPrompt = buildResearchUserPrompt({
       guestName,

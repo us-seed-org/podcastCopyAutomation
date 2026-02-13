@@ -13,6 +13,7 @@ export async function POST(request: Request) {
         recentVideos: [],
         topNicheVideos: [],
         titlePatterns: [],
+        descriptionPattern: null,
         avgViews: 0,
         engagementBenchmarks: { avgLikeRate: 0, avgCommentRate: 0 },
       });

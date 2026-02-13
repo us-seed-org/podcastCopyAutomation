@@ -9,9 +9,10 @@ interface CopyButtonProps {
   label?: string;
   variant?: "default" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
 }
 
-export function CopyButton({ text, label, variant = "outline", size = "sm" }: CopyButtonProps) {
+export function CopyButton({ text, label, variant = "outline", size = "sm", className }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -21,7 +22,7 @@ export function CopyButton({ text, label, variant = "outline", size = "sm" }: Co
   };
 
   return (
-    <Button variant={variant} size={size} onClick={handleCopy}>
+    <Button variant={variant} size={size} onClick={handleCopy} className={className}>
       {copied ? (
         <>
           <Check className="h-3.5 w-3.5 mr-1" />

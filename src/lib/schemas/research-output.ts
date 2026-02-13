@@ -6,6 +6,12 @@ export const topicSegmentSchema = z.object({
   summary: z.string(),
 });
 
+export const guestTierSchema = z.object({
+  tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  reasoning: z.string(),
+  youtubeRecommendation: z.string(),
+});
+
 export const researchOutputSchema = z.object({
   guest: z.object({
     name: z.string(),
@@ -14,6 +20,7 @@ export const researchOutputSchema = z.object({
     socialPresence: z.string(),
     controversies: z.string(),
     authorityLabel: z.string(),
+    guestTier: guestTierSchema,
   }),
   brand: z.object({
     podcastName: z.string(),

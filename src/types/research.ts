@@ -1,3 +1,9 @@
+export interface GuestTier {
+  tier: 1 | 2 | 3;
+  reasoning: string;
+  youtubeRecommendation: string;
+}
+
 export interface GuestResearch {
   name: string;
   bio: string;
@@ -5,6 +11,7 @@ export interface GuestResearch {
   socialPresence: string;
   controversies: string;
   authorityLabel: string;
+  guestTier: GuestTier;
 }
 
 export interface BrandAnalysis {

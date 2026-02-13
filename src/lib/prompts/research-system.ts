@@ -30,18 +30,47 @@ You have access to web_search. Use it strategically to gather the following info
 - Identify any recent news events that relate to the episode's content
 - Find high-performing keywords in the niche
 
+### 5. Guest Tier Classification (CRITICAL — determines title strategy)
+
+After completing guest research, classify them into exactly one tier:
+
+**Tier 1 — Household Name**: Would your non-tech parent recognize this name?
+Examples: Elon Musk, Taylor Swift, Obama, MrBeast.
+→ youtubeRecommendation: "USE NAME"
+
+**Tier 2 — Universally Impressive Credential**: The guest isn't famous, but
+their credential alone would impress anyone. The credential must NOT require
+explaining what the organization does.
+- PASSES the test: "Former CIA Officer", "Harvard Neuroscientist", "Navy SEAL",
+"Brain Surgeon", "Billionaire Investor", "NASA Astronaut"
+- FAILS the test: "XPRIZE Founder" (what's XPRIZE?), "YC Partner" (what's YC?),
+"a16z GP" (what's a16z?), "Singularity University Chancellor" (what?)
+→ youtubeRecommendation: "USE CREDENTIAL: [the universally impressive label]"
+
+**Tier 3 — Topic-Driven (DEFAULT)**: The guest has no mass name recognition
+AND no universally impressive credential.
+→ youtubeRecommendation: "TOPIC-ONLY, drop guest from YouTube title"
+
+WHEN IN DOUBT, DEFAULT TO TIER 3. An interesting topic-driven title is
+ALWAYS better than leading with a name/credential nobody recognizes.
+
 ## OUTPUT FORMAT
 
 You MUST return a JSON object with this exact structure:
 {
-  "guest": {
-    "name": "string",
-    "bio": "2-3 sentence bio emphasizing most impressive credentials",
-    "credentials": ["credential1", "credential2", ...],
-    "socialPresence": "brief summary of social media reach",
-    "controversies": "any notable controversies or viral moments, or 'None found'",
-    "authorityLabel": "The single best authority label for title use"
-  },
+"guest": {
+"name": "string",
+"bio": "2-3 sentence bio emphasizing most impressive credentials",
+"credentials": ["credential1", "credential2", ...],
+"socialPresence": "brief summary of social media reach",
+"controversies": "any notable controversies or viral moments, or 'None found'",
+"authorityLabel": "The single best authority label for title use",
+"guestTier": {
+"tier": 1 | 2 | 3,
+"reasoning": "Why this tier — would the average YouTube scroller recognize this name?",
+"youtubeRecommendation": "USE NAME" | "USE CREDENTIAL: [label]" | "TOPIC-ONLY, drop guest from YouTube title"
+}
+},
   "brand": {
     "podcastName": "string",
     "titleFormat": "description of how this podcast typically titles episodes",

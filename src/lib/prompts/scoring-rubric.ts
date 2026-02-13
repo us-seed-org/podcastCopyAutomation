@@ -1,82 +1,86 @@
 export const SCORING_RUBRIC = `
-## TITLE SCORING RUBRIC (100 points total)
+## SCORING RUBRIC (Externally Calibrated)
 
-You MUST score every title against this rubric. Every title must achieve 80+ or be internally rewritten until it does.
+### Tier Definitions (for Authority Signal scoring)
+- **Tier 1**: Household names that need no explanation (e.g., "Sam Altman", "Elon Musk", "Taylor Swift")
+- **Tier 2**: Industry-recognized names within their field (e.g., "Dr. Andrew Huberman", "Lex Fridman")
+- **Tier 3**: Niche experts or unknown guests — score the topic's inherent authority instead
 
-### 1. Curiosity Gap (0-20 points)
-- 18-20: Creates a SPECIFIC unanswered question the viewer MUST click to resolve. Uses open loops, incomplete information, or counterintuitive claims.
-  Example: "The Sleep Trick That Reversed My Diabetes" (What trick? How?)
-- 14-17: Creates moderate curiosity but the gap could be more specific.
-- 8-13: Mild curiosity. Viewer can guess the answer.
-- 0-7: No curiosity gap. Title is purely descriptive.
+CRITICAL: You are NOT scoring your own homework. You are comparing your
+titles against REAL titles with KNOWN performance. If your title wouldn't
+perform as well as the calibration example, it CANNOT score as high.
 
-### 2. Authority Signal (0-15 points)
-- 13-15: Leverages recognizable expert name, credential, or brand that instantly signals credibility.
-  Example: "Harvard Neuroscientist", "Navy SEAL", "Billionaire CEO"
-- 9-12: Has authority but it's not instantly recognizable to most viewers.
-- 5-8: Weak authority signal. Generic title like "Doctor" or "Expert."
-- 0-4: No authority signal.
+### Calibration Benchmarks (these are GROUND TRUTH):
 
-### 3. Emotional Trigger (0-15 points)
-- 13-15: Triggers a STRONG primary emotion — fear, shock, outrage, deep curiosity, or urgent aspiration.
-  Words that score high: "destroyed", "ruined", "secret", "banned", "warning", "shocking truth"
-- 9-12: Moderate emotional response. Interesting but not compelling.
-- 5-8: Mild emotional engagement.
-- 0-4: Emotionally flat. Purely informational.
+**Score 95:** "Nuclear War Expert: 72 Minutes To Wipe Out 60% Of Humans!"
+(DOAC, 16M views)
+- WHY: Extreme specificity (72 minutes, 60%), visceral fear, universal
+  stakes, authority label that needs no explanation
 
-KEY INSIGHT: Negative sentiment titles get 22% more views on average. Loss aversion ("What you're losing") outperforms gain framing ("What you could gain") by 2-3x in CTR.
+**Score 90:** "What Alcohol Does to Your Body, Brain & Health"
+(Huberman, 18M views)
+- WHY: Universally relevant topic, specific mechanism promise,
+  clean/searchable, no gimmicks needed
 
-### 4. Trending Keyword (0-10 points)
-- 8-10: Contains a currently trending or high-search-volume keyword in the niche.
-- 5-7: Contains an evergreen keyword with consistent search volume.
-- 2-4: Keyword present but low search relevance.
-- 0-1: No relevant keywords.
+**Score 85:** "Sam Altman | The Future of AI in America"
+- WHY: Tier 1 name that IS the hook. The pipe separator feels
+  clean/premium. "in America" adds a political/competitive angle
+  that "of AI" alone doesn't. For Tier 1 guests, the title's job
+  is to GET OUT OF THE WAY of the name.
 
-### 5. Specificity (0-10 points)
-- 8-10: Contains specific numbers, percentages, timeframes, or mechanisms.
-  Example: "3 Foods That Kill 90% of Cancer Cells" vs "Foods That Fight Cancer"
-- 5-7: Some specificity but could be more concrete.
-- 2-4: Vague. Uses words like "some", "many", "things".
-- 0-1: Completely generic.
+**Score 70:** "Why Everyone Is Talking About AI Right Now"
+(no guest, no specificity, ~200K views)
+- WHY: Vague topic with no specific claim, no authority, no number,
+  no mechanism. "Right now" is empty urgency. This is what happens
+  when you have nothing interesting to say but still need a title.
 
-INSIGHT: Specific numbers signal credibility. "7 habits" outperforms "habits" by 3x in CTR.
+**Score 55:** "AI Agents, Robot CEOs & The End of Middle Management"
+(AI-generated feel, low CTR)
+- WHY: Buzzword dump, no specific claim, no human voice,
+  reads like a conference panel title
 
-### 6. Character Count (0-10 points)
-**YouTube**: Optimal 50-65 characters (visible without truncation)
-- 10: 50-65 characters
-- 7: 66-80 characters
-- 5: 40-49 characters
-- 3: 81+ characters (gets truncated)
+**Score 50:** "AI CEOs? Could a Model Run a $1B Company Today? Why It Matters"
+- WHY: Double question = indecisive. "Why It Matters" is pure filler.
+  "Could a Model" is ambiguous (fashion model?). Sounds like a blog post,
+  not a YouTube title. Nobody stops scrolling for a hedging question.
 
-**Spotify**: Optimal 60-80 characters
-- 10: 60-80 characters
-- 7: 50-59 characters
-- 5: 81-100 characters
-- 3: 100+ characters
+**Score 45:** "Vision Agents Are Here: Ray-Ban Glasses Turn AI First-Person"
+- WHY: "[X] Are Here" is generic announcement language. "Turn AI First-Person"
+  is confusing — what does that even mean? The colon structure reads like a
+  press release. Compare to: "Ray-Ban Just Put an AI Agent in Your Glasses"
+  which is specific, visceral, and conversational.
 
-### 7. Word Balance (0-10 points)
-Optimal mix: 20-30% common words, 10-20% uncommon words, 10-15% emotional words, 1+ power words.
-- 8-10: Perfect balance. Title flows naturally while using power/emotional words.
-  Power words: "secret", "shocking", "devastating", "ultimate", "proven", "hidden"
-  Emotional words: "heartbreaking", "terrifying", "incredible", "life-changing"
-- 5-7: Decent balance but could improve one category.
-- 2-4: Imbalanced. Too many common words or too forced.
-- 0-1: All common words or incomprehensible word salad.
+**Score 30:** "Peter Diamandis on Agents, AI CEOs, 108K Layoffs & Solve Everything"
+- WHY: Keyword dump with a name prepended. Lists 5 topics instead of
+  picking ONE compelling angle. No curiosity gap, no emotion, no opinion.
+  This is a table of contents, not a title.
 
-### 8. Front-Load Hook (0-5 points)
-- 4-5: The hook/intrigue is in the FIRST 50 characters (visible in search results and notifications).
-- 2-3: Hook appears but is buried in the middle/end.
-- 0-1: No clear hook, or hook is cut off in previews.
+**Score 45:** "He Wants to Replace Every CEO With an AI"
+- WHY: "He" has no antecedent — the audience has no idea who "he" is.
+  This isn't mystery, it's confusion. A dangling pronoun is not a hook.
+  Compare to: "AI CEOs Are Coming to the Fortune 500" which makes the
+  IDEA the subject, not an anonymous person.
 
-### 9. Thumbnail Complement (0-5 points)
-- 4-5: Title adds information that a thumbnail CANNOT show. Title + thumbnail tell different parts of the story.
-  Good: Thumbnail shows shocked face, title reveals WHY they're shocked.
-- 2-3: Title partially overlaps with likely thumbnail content.
-- 0-1: Title and thumbnail would be redundant.
+**Score 40:** "An AI Agent Emailed Us — They Wrote Their Own Ethics"
+- WHY: Vague ("us" who?), em dash, anthropomorphizing cliché,
+  no stakes, sounds like a tech blog, wouldn't stop anyone scrolling
 
-## SCORE CALIBRATION
-- 95-100: Viral potential. Would perform in top 1% of niche.
-- 85-94: Strong performer. Expect above-average CTR.
-- 75-84: Decent. Will perform at or slightly above average.
-- Below 75: REWRITE. Do not output any title scoring below 80.
+### Scoring Dimensions (same weights, but CALIBRATED):
+
+| Dimension | Points | The REAL test |
+|-----------|--------|---------------|
+| Curiosity Gap | /20 | Does it create a SPECIFIC question I need answered? Not "hmm interesting" but "WAIT WHAT?" If the question is vague, max 8. |
+| Authority Signal | /15 | Would your MOM be impressed by this credential? If it requires explaining, max 5. If it's Tier 3, score the topic's inherent authority instead. |
+| Emotional Trigger | /15 | Does it trigger a GUT reaction? Fear of missing out, fear of harm, outrage, shock? If the reaction is just "oh, neat" — max 6. |
+| Trending Keyword | /10 | Is there a word/phrase people are ACTIVELY searching for right now? Not just "AI" (too broad) but "AI layoffs" or "Ozempic" or "vibe coding" (specific trending terms). |
+| Specificity | /10 | Specific numbers, percentages, timeframes, mechanisms? "72 minutes" scores 10. "The future" scores 2. |
+| Character Count | /10 | 50-65 chars = 10, 40-50 or 66-75 = 7, outside that = 4. |
+| Word Balance | /10 | Does it sound like a HUMAN said it? Read it out loud. If it sounds like a robot wrote it, max 4. |
+| Front-Load | /5 | First 5 words must create the hook. If the interesting part is at the end, max 2. |
+| Thumbnail Complement | /5 | Does it add info that a face+emotion thumbnail doesn't already convey? |
+
+### THE HONESTY CHECK
+After scoring, ask: "If this title appeared next to the 95-score calibration
+example in someone's feed, would it compete for the click?"
+If no, your score is too high. Reduce by 10-15 points.
 `;
