@@ -3,8 +3,14 @@ export const SCORING_RUBRIC = `
 
 ### Tier Definitions (for Authority Signal scoring)
 - **Tier 1**: Household names that need no explanation (e.g., "Sam Altman", "Elon Musk", "Taylor Swift")
-- **Tier 2**: Industry-recognized names within their field (e.g., "Dr. Andrew Huberman", "Lex Fridman")
-- **Tier 3**: Niche experts or unknown guests — score the topic's inherent authority instead
+- **Tier 2**: Industry-recognized names within their field. This covers a WIDE range:
+  - Podcast hosts (e.g., "Lex Fridman", "Joe Rogan", "Tim Ferriss")
+  - NYT Bestselling authors (e.g., "James Clear", "Brené Brown")
+  - Recognized founders/CEOs (e.g., "Marc Benioff", "Reshma Saujani")
+  - Niche influencers (10K-500K subscribers in specific domains)
+  - Academic experts (e.g., "Dr. Andrew Huberman", "Dr. Peter Attia")
+  - **IMPORTANT**: Most podcast guests fall into Tier 2. Don't penalize them for not being Elon Musk.
+- **Tier 3**: Truly unknown guests with no online presence — score the topic's inherent authority instead
 
 CRITICAL: You are NOT scoring your own homework. You are comparing your
 titles against REAL titles with KNOWN performance. If your title wouldn't
@@ -27,6 +33,15 @@ perform as well as the calibration example, it CANNOT score as high.
   clean/premium. "in America" adds a political/competitive angle
   that "of AI" alone doesn't. For Tier 1 guests, the title's job
   is to GET OUT OF THE WAY of the name.
+
+**Score 82:** "James Clear: The Secret to Building Habits That Stick"
+- WHY: Tier 2 name (bestselling author) with specific mechanism promise.
+  The colon structure works well for recognized experts. "Secret" is
+  slightly clickbaity but acceptable for this tier.
+
+**Score 78:** "Peter Attia: The 4 Pillars of Longevity"
+- WHY: Tier 2 doctor with clear framework. Numbers work well for
+  authority figures. Clean, professional, promises specific value.
 
 **Score 70:** "Why Everyone Is Talking About AI Right Now"
 (no guest, no specificity, ~200K views)

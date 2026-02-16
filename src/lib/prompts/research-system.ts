@@ -66,9 +66,9 @@ You MUST return a JSON object with this exact structure:
 "controversies": "any notable controversies or viral moments, or 'None found'",
 "authorityLabel": "The single best authority label for title use",
 "guestTier": {
-"tier": 1 | 2 | 3,
+"tier": 2,
 "reasoning": "Why this tier — would the average YouTube scroller recognize this name?",
-"youtubeRecommendation": "USE NAME" | "USE CREDENTIAL: [label]" | "TOPIC-ONLY, drop guest from YouTube title"
+"youtubeRecommendation": "USE CREDENTIAL: Harvard Professor"
 }
 },
   "brand": {

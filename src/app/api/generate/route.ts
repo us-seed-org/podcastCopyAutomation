@@ -48,7 +48,7 @@ async function callModel(instructions: string, input: string, tools?: unknown[])
     }
   }
 
-  // Iterative JSON.parse extraction — handles braces inside JSON strings correctly
+  // Brace-depth JSON extraction — properly handles nested objects and strings
   const startIdx = text.indexOf('{');
   if (startIdx === -1) {
     console.warn("[callModel] No '{' found in response");
@@ -56,14 +56,48 @@ async function callModel(instructions: string, input: string, tools?: unknown[])
     return null;
   }
 
-  for (let endIdx = startIdx + 1; endIdx < text.length; endIdx++) {
-    if (text[endIdx] !== '}') continue;
-    try {
-      const parsed = JSON.parse(text.slice(startIdx, endIdx + 1));
-      console.log("[callModel] Successfully parsed JSON via iterative extraction");
-      return parsed;
-    } catch {
-      // Not a complete JSON object yet — keep scanning
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const char = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"' && !inString) {
+      inString = true;
+      continue;
+    }
+
+    if (char === '"' && inString) {
+      inString = false;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          try {
+            const parsed = JSON.parse(text.slice(startIdx, i + 1));
+            console.log("[callModel] Successfully parsed JSON via brace-depth extraction");
+            return parsed;
+          } catch {
+            // Not valid JSON, continue searching
+          }
+        }
+      }
     }
   }
 
@@ -215,7 +249,7 @@ export async function POST(request: Request) {
 
 The following titles were scored by an independent evaluator and FAILED (below 75/100):
 
-${feedback.join("\n")}
+${feedback.map(f => `${f.platform}: "${f.title}" — ${f.message}`).join("\n")}
 
 ## ORIGINAL RESEARCH
 ${researchStr}
@@ -237,6 +271,14 @@ Return the same JSON structure. All titles MUST score 75+.`;
             const rewritten = await callModel(systemPrompt, rewriteInput, [{ type: "web_search_preview" }]);
 
             if (rewritten) {
+              // Validate rewrite counts match expected weak indices
+              if (weakYTIndices.length > 0 && rewritten.youtubeTitles?.length !== weakYTIndices.length) {
+                console.warn(`[Rewrite] YouTube title count mismatch: expected ${weakYTIndices.length}, got ${rewritten.youtubeTitles?.length || 0}`);
+              }
+              if (weakSPIndices.length > 0 && rewritten.spotifyTitles?.length !== weakSPIndices.length) {
+                console.warn(`[Rewrite] Spotify title count mismatch: expected ${weakSPIndices.length}, got ${rewritten.spotifyTitles?.length || 0}`);
+              }
+
               const rewriteScored = await callModel(scoringPrompt, buildScoringUserPrompt({
                 generatedTitles: JSON.stringify(rewritten, null, 2),
                 research: researchStr,
@@ -381,8 +423,12 @@ Return the same JSON structure.`;
                 if (chapScore < 70 && rewrittenDesc.chapters) {
                   generated.chapters = rewrittenDesc.chapters;
                 }
-                generated.descriptionScore = rewrittenDesc.descriptionScore || generated.descriptionScore;
-                generated.chapterScore = rewrittenDesc.chapterScore || generated.chapterScore;
+                if (rewrittenDesc.youtubeDescription || rewrittenDesc.spotifyDescription) {
+                  generated.descriptionScore = rewrittenDesc.descriptionScore || generated.descriptionScore;
+                }
+                if (chapScore < 70 && rewrittenDesc.chapters) {
+                  generated.chapterScore = rewrittenDesc.chapterScore || generated.chapterScore;
+                }
               }
             }
           }

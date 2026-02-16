@@ -49,6 +49,10 @@ Return ONLY the JSON object. No other text.`;
 }
 
 export function buildDescriptionAnalysisUserPrompt(descriptions: string[]): string {
+  if (descriptions.length === 0) {
+    return `ERROR: No descriptions provided. Cannot perform analysis.`;
+  }
+
   const numbered = descriptions
     .map((d, i) => `=== DESCRIPTION ${i + 1} ===\n${d}`)
     .join("\n\n");

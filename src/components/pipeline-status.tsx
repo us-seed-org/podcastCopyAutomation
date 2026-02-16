@@ -10,6 +10,9 @@ interface PipelineStatusProps {
     youtubeStatus: string;
     generationStatus: string;
     error: string | null;
+    hasResearchData?: boolean;
+    hasYouTubeData?: boolean;
+    hasGenerationData?: boolean;
 }
 
 type StepState = "idle" | "active" | "done" | "error" | "skipped";
@@ -17,7 +20,9 @@ type StepState = "idle" | "active" | "done" | "error" | "skipped";
 function getStepState(
     targetStep: "research" | "youtube" | "generation",
     currentStep: PipelineStep,
-    status: string
+    status: string,
+    statuses: Record<string, string>,
+    dataPresence: Record<string, boolean>
 ): StepState {
     const order: PipelineStep[] = ["idle", "research", "youtube", "generation", "complete", "error"];
     const targetIndex = order.indexOf(targetStep);
@@ -29,8 +34,37 @@ function getStepState(
 
     if (currentStep === "complete") return "done";
     if (currentStep === "error") {
-        if (currentIndex > targetIndex) return "done";
-        return "error";
+        const stepStatusMap: Record<string, string> = {
+            research: statuses.research,
+            youtube: statuses.youtube,
+            generation: statuses.generation,
+        };
+        
+        const stepsToCheck = order.slice(1, order.indexOf("error"));
+        let failedStepIndex = -1;
+        
+        for (let i = 0; i < stepsToCheck.length; i++) {
+            const step = stepsToCheck[i];
+            if (stepStatusMap[step]?.toLowerCase().includes("failed")) {
+                failedStepIndex = i;
+                break;
+            }
+        }
+        
+        if (failedStepIndex === -1) {
+            const hasData = dataPresence[targetStep];
+            
+            if (!hasData && currentIndex > targetIndex) {
+                return "idle";
+            }
+            if (currentIndex > targetIndex) return "done";
+            return "error";
+        }
+        
+        const targetStepIndex = stepsToCheck.indexOf(targetStep);
+        if (targetStepIndex < failedStepIndex) return "done";
+        if (targetStepIndex === failedStepIndex) return "error";
+        return "idle";
     }
 
     if (currentIndex > targetIndex) return "done";
@@ -38,18 +72,18 @@ function getStepState(
     return "idle";
 }
 
-function StepIcon({ state }: { state: StepState }) {
+function StepIcon({ state, size = "sm" }: { state: StepState; size?: "sm" | "lg" }) {
+    const sizeClasses = size === "lg" ? "h-[18px] w-[18px]" : "h-4 w-4";
     switch (state) {
         case "active":
-            return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
+            return <Loader2 className={`${sizeClasses} animate-spin text-primary`} />;
         case "done":
-            return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-        case "error":
-            return <XCircle className="h-4 w-4 text-destructive" />;
         case "skipped":
-            return <CheckCircle2 className="h-4 w-4 text-muted-foreground" />;
+            return <CheckCircle2 className={`${sizeClasses} text-emerald-500`} />;
+        case "error":
+            return <XCircle className={`${sizeClasses} text-destructive`} />;
         default:
-            return <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />;
+            return <div className={`${sizeClasses} rounded-full border-2 border-muted-foreground/30`} />;
     }
 }
 
@@ -59,7 +93,7 @@ const steps = [
     { key: "generation" as const, label: "Copy Generation", icon: Wand2, description: "Generating & scoring titles" },
 ];
 
-export function PipelineStatus({ step, researchStatus, youtubeStatus, generationStatus, error }: PipelineStatusProps) {
+export function PipelineStatus({ step, researchStatus, youtubeStatus, generationStatus, error, hasResearchData, hasYouTubeData, hasGenerationData }: PipelineStatusProps) {
     if (step === "idle") return null;
 
     const statusMessages: Record<string, string> = {
@@ -68,13 +102,19 @@ export function PipelineStatus({ step, researchStatus, youtubeStatus, generation
         generation: generationStatus,
     };
 
+    const dataPresence: Record<string, boolean> = {
+        research: !!hasResearchData,
+        youtube: !!hasYouTubeData,
+        generation: !!hasGenerationData,
+    };
+
     return (
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-primary/60 via-primary/30 to-transparent" />
             <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-4">
                     {steps.map((s, i) => {
-                        const state = getStepState(s.key, step, statusMessages[s.key] || "");
+                        const state = getStepState(s.key, step, statusMessages[s.key] || "", statusMessages, dataPresence);
                         const StatusIconComponent = s.icon;
                         return (
                             <div key={s.key} className="flex items-center gap-3 flex-1">
@@ -100,7 +140,7 @@ export function PipelineStatus({ step, researchStatus, youtubeStatus, generation
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-sm font-medium ${state === "active" ? "text-foreground" : state === "done" ? "text-emerald-500" : "text-muted-foreground"
+                                        <span className={`text-sm font-medium ${state === "active" ? "text-foreground" : state === "done" || state === "skipped" ? "text-emerald-500" : "text-muted-foreground"
                                             }`}>
                                             {s.label}
                                         </span>

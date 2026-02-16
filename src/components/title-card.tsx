@@ -53,19 +53,27 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
           {title.title}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/10">
-            <Sparkles className="h-3 w-3" />
-            {title.scrollStopReason}
-          </span>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
-            {title.emotionalTrigger}
-          </span>
-        </div>
+        {(title.scrollStopReason || title.emotionalTrigger) && (
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {title.scrollStopReason && (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/10">
+                <Sparkles className="h-3 w-3" />
+                {title.scrollStopReason}
+              </span>
+            )}
+            {title.emotionalTrigger && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                {title.emotionalTrigger}
+              </span>
+            )}
+          </div>
+        )}
 
-        <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-          {title.platformNotes}
-        </p>
+        {title.platformNotes && (
+          <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+            {title.platformNotes}
+          </p>
+        )}
 
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between">

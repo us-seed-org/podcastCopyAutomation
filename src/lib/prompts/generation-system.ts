@@ -381,40 +381,27 @@ Focus ALL of your reasoning and creativity on the titles.
 - Do NOT include youtubeDescription, spotifyDescription, or chapters fields.`;
 }
 
-function sanitizePromptInput(input: string): string {
-  // Escape backticks and ${ sequences to prevent template injection
-  // Match raw backticks and ${, not already-escaped ones
-  return input
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
-}
-
 export function buildGenerationUserPrompt(input: {
   research: string;
   youtubeAnalysis: string;
   transcript: string;
   episodeDescription: string;
 }): string {
-  const sanitizedResearch = sanitizePromptInput(input.research);
-  const sanitizedYoutubeAnalysis = sanitizePromptInput(input.youtubeAnalysis);
-  const sanitizedEpisodeDescription = sanitizePromptInput(input.episodeDescription);
-  const sanitizedTranscript = sanitizePromptInput(input.transcript);
-
   return `## RESEARCH INTELLIGENCE
 
-${sanitizedResearch}
+${input.research}
 
 ## YOUTUBE COMPETITIVE ANALYSIS
 
-${sanitizedYoutubeAnalysis}
+${input.youtubeAnalysis}
 
 ## EPISODE DESCRIPTION
 
-${sanitizedEpisodeDescription}
+${input.episodeDescription}
 
 ## TRANSCRIPT HIGHLIGHTS
 
-${sanitizedTranscript}
+${input.transcript}
 
 Now generate optimized TITLES ONLY (descriptions and chapters are handled separately). Remember:
 - Follow the MANDATORY GENERATION PROCESS (brainstorm 10 → kill weak ones → polish survivors)

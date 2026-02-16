@@ -249,7 +249,10 @@ function extractTitlePatterns(titles: string[]): string[] {
 }
 
 function extractDescriptionPatterns(videos: YouTubeVideoStats[]): DescriptionPattern | null {
-  const descriptions = videos.map((v) => v.description).filter((d) => d && d.length > 50);
+  const descriptions = videos
+    .map((v) => v.description)
+    .filter((d) => d && d.length > 50)
+    .map((d) => d.slice(0, 2000)); // Truncate to prevent ReDoS
   if (descriptions.length < 3) return null;
 
   // Extract structural skeleton by finding common section markers
@@ -278,15 +281,15 @@ function extractDescriptionPatterns(videos: YouTubeVideoStats[]): DescriptionPat
     (d) => /subscri/i.test(d) || /hit the bell/i.test(d) || /turn on notifications/i.test(d)
   );
   const subscribeBlock = subscribePatterns.length > threshold
-    ? extractCommonBlock(descriptions, /subscri.*?(?:\n\n|\n(?=[A-Z]))/i)
+    ? extractFirstMatchingBlock(descriptions, /subscri[\s\S]{0,500}?(?:\n\n|\n(?=[A-Z]))/i)
     : "";
 
-  // Detect social links format
+  // Detect social links format - count @ occurrences first to avoid nested quantifiers
   const socialPatterns = descriptions.filter(
     (d) => /follow|twitter|instagram|tiktok|@/i.test(d)
   );
   const socialLinksFormat = socialPatterns.length > threshold
-    ? extractCommonBlock(descriptions, /(?:follow|connect|find)[\s\S]*?(?:@\w+[\s\S]*?){2,}/i)
+    ? extractFirstMatchingBlock(descriptions, /(?:follow|connect|find)[\s\S]{0,500}?@\w+[\s\S]{0,300}?@\w+[\s\S]{0,300}/i)
     : "";
 
   // Detect newsletter plugs
@@ -294,7 +297,7 @@ function extractDescriptionPatterns(videos: YouTubeVideoStats[]): DescriptionPat
     (d) => /newsletter|sign up|signup|email list/i.test(d)
   );
   const newsletterPlug = newsletterPatterns.length > threshold
-    ? extractCommonBlock(descriptions, /newsletter[\s\S]*?(?:\n\n|\n(?=[A-Z]))/i)
+    ? extractFirstMatchingBlock(descriptions, /newsletter[\s\S]{0,500}?(?:\n\n|\n(?=[A-Z]))/i)
     : "";
 
   // Detect hashtag usage
@@ -319,9 +322,9 @@ function extractDescriptionPatterns(videos: YouTubeVideoStats[]): DescriptionPat
   const openingStyle = analyzeOpeningStyle(descriptions);
 
   // Detect CTA block
-  const ctaBlock = extractCommonBlock(
+  const ctaBlock = extractFirstMatchingBlock(
     descriptions,
-    /(?:like|comment|share|subscribe|leave a review)[\s\S]*?(?:\n\n|$)/i
+    /(?:like|comment|share|subscribe|leave a review)[\s\S]{0,500}?(?:\n\n|$)/i
   );
 
   // Keep raw examples (first 5, truncated)
@@ -342,7 +345,7 @@ function extractDescriptionPatterns(videos: YouTubeVideoStats[]): DescriptionPat
   };
 }
 
-function extractCommonBlock(descriptions: string[], pattern: RegExp): string {
+function extractFirstMatchingBlock(descriptions: string[], pattern: RegExp): string {
   for (const desc of descriptions) {
     const match = desc.match(pattern);
     if (match) return match[0].trim().slice(0, 500);
@@ -432,7 +435,12 @@ function analyzeOpeningStyle(descriptions: string[]): string {
   if (openings.length === 0) return "unknown";
 
   // Check if openings typically start with a question
-  const questionStarts = openings.filter((o) => o.includes("?")).length;
+  // Look for leading question words or ? within first 30 chars (not anywhere in the text)
+  const questionWords = /^(?:what|why|how|when|where|who|is|are|do|does|can|could|would|will)/i;
+  const questionStarts = openings.filter((o) => {
+    const first30 = o.slice(0, 30);
+    return questionWords.test(first30) || first30.includes("?");
+  }).length;
   if (questionStarts / openings.length > 0.4) return "question-led opening";
 
   // Check if openings start with "In this episode" or similar
@@ -471,20 +479,43 @@ function buildStructuralSkeleton(descriptions: string[]): string[] {
     { label: "Sponsors/ads", pattern: /(?:sponsor|partner|brought to you|use code)/i },
   ];
 
-  const sectionCounts: Record<string, number> = {};
+  // Track both count and cumulative position for each section type
+  const sectionData: Record<string, { count: number; totalPosition: number }> = {};
+  
   for (const desc of descriptions) {
     const firstPara = desc.split(/\n\n/)[0] || desc.split("\n")[0] || "";
+    let cumulativePosition = 0;
+    
     for (const { label, pattern } of sectionTypes) {
       const textToTest = label === "Opening/hook paragraph" ? firstPara : desc;
       if (pattern.test(textToTest)) {
-        sectionCounts[label] = (sectionCounts[label] || 0) + 1;
+        if (!sectionData[label]) {
+          sectionData[label] = { count: 0, totalPosition: 0 };
+        }
+        sectionData[label].count++;
+        sectionData[label].totalPosition += cumulativePosition;
       }
+      cumulativePosition++;
     }
   }
 
   const threshold = descriptions.length * 0.3;
-  return Object.entries(sectionCounts)
-    .filter(([, count]) => count >= threshold)
-    .sort((a, b) => b[1] - a[1])
-    .map(([label]) => label);
+  
+  // Convert to array with average position, filter by threshold, and sort
+  return Object.entries(sectionData)
+    .filter(([, data]) => data.count >= threshold)
+    .map(([label, data]) => ({
+      label,
+      count: data.count,
+      avgPosition: data.totalPosition / data.count,
+    }))
+    .sort((a, b) => {
+      // First sort by average position (to preserve document structure)
+      if (a.avgPosition !== b.avgPosition) {
+        return a.avgPosition - b.avgPosition;
+      }
+      // Then by frequency
+      return b.count - a.count;
+    })
+    .map(({ label }) => label);
 }

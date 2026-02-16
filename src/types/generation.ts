@@ -60,7 +60,7 @@ export interface GenerationOutput {
   youtubeDescription?: string;
   spotifyDescription?: string;
   chapters?: ChapterTitle[];
-  tierClassification?: TierClassification | null;
-  descriptionScore?: DescriptionScore | null;
-  chapterScore?: ChapterScore | null;
+  tierClassification?: TierClassification;
+  descriptionScore?: DescriptionScore;
+  chapterScore?: ChapterScore;
 }

@@ -61,8 +61,8 @@ export const generationOutputSchema = z.object({
   spotifyDescription: z.string().optional(),
   chapters: z.array(chapterTitleSchema).optional(),
   tierClassification: tierClassificationSchema.optional(),
-  descriptionScore: descriptionScoreSchema.optional().nullable(),
-  chapterScore: chapterScoreSchema.optional().nullable(),
+  descriptionScore: descriptionScoreSchema.optional(),
+  chapterScore: chapterScoreSchema.optional(),
 });
 
 export type GenerationOutputSchema = z.infer<typeof generationOutputSchema>;

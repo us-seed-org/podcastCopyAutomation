@@ -13,6 +13,7 @@ export interface PipelineState {
   youtube: YouTubeAnalysis | null;
   generation: GenerationOutput | null;
   error: string | null;
+  isRegenerating: boolean;
 }
 
 export interface FormInput {

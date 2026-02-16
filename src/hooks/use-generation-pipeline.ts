@@ -15,6 +15,7 @@ const initialState: PipelineState = {
   youtube: null,
   generation: null,
   error: null,
+  isRegenerating: false,
 };
 
 function pipelineReducer(state: PipelineState, action: PipelineAction): PipelineState {
@@ -36,7 +37,7 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         step: state.youtube !== null || !state.youtubeStatus ? "generation" : state.step,
       };
     case "RESEARCH_ERROR":
-      return { ...state, step: "error", error: `Research failed: ${action.error}`, researchStatus: "Failed" };
+      return { ...state, step: "error", error: `Research failed: ${action.error}`, researchStatus: "Failed", isRegenerating: false };
     case "YOUTUBE_STATUS":
       return { ...state, youtubeStatus: action.status };
     case "YOUTUBE_COMPLETE":
@@ -62,9 +63,10 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         generation: action.data,
         generationStatus: "Generation complete",
         step: "complete",
+        isRegenerating: false,
       };
     case "GENERATION_ERROR":
-      return { ...state, step: "error", error: `Generation failed: ${action.error}`, generationStatus: "Failed" };
+      return { ...state, step: "error", error: `Generation failed: ${action.error}`, generationStatus: "Failed", isRegenerating: false };
     case "RESET":
       return initialState;
     case "REGENERATE":
@@ -74,6 +76,7 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         generation: null,
         generationStatus: "Regenerating...",
         error: null,
+        isRegenerating: true,
       };
     default:
       return state;
@@ -293,5 +296,6 @@ export function useGenerationPipeline() {
     regenerate,
     reset,
     isRunning: state.step !== "idle" && state.step !== "complete" && state.step !== "error",
+    isRegenerating: state.isRegenerating,
   };
 }

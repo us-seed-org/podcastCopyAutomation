@@ -52,7 +52,7 @@ export async function POST(request: Request) {
               podcastName: podcastName,
               titleFormat: "Topic-driven episodes",
               voiceDescription: "Based on transcript content",
-              audienceProfile: "General audience interested in discussed topics"
+              audienceProfile: targetAudience || "General audience interested in discussed topics"
             },
             transcript: {
               topClaims: [],

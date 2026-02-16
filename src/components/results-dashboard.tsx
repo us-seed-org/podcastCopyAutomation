@@ -94,7 +94,7 @@ export function ResultsDashboard({ data, onRegenerate, isRegenerating }: Results
                                     <Youtube className="h-5 w-5 text-red-500" />
                                     <CardTitle className="text-base">YouTube Description</CardTitle>
                                 </div>
-                                <CopyButton text={data.youtubeDescription || ""} label="Copy" />
+                                <CopyButton text={data.youtubeDescription || ""} label="Copy" disabled={!data.youtubeDescription} />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -111,7 +111,7 @@ export function ResultsDashboard({ data, onRegenerate, isRegenerating }: Results
                                     <Headphones className="h-5 w-5 text-emerald-500" />
                                     <CardTitle className="text-base">Spotify Description</CardTitle>
                                 </div>
-                                <CopyButton text={data.spotifyDescription || ""} label="Copy" />
+                                <CopyButton text={data.spotifyDescription || ""} label="Copy" disabled={!data.spotifyDescription} />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -128,7 +128,7 @@ export function ResultsDashboard({ data, onRegenerate, isRegenerating }: Results
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base">Chapter Timestamps</CardTitle>
-                                <CopyButton text={chaptersText} label="Copy All" />
+                                <CopyButton text={chaptersText} label="Copy All" disabled={!chaptersText} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Paste these into your YouTube description for auto-generated chapters

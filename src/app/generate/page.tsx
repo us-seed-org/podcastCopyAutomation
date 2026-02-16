@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, Mic2, Sparkles } from "lucide-react";
 
 export default function GeneratePage() {
-    const { state, start, regenerate, reset, isRunning } = useGenerationPipeline();
+    const { state, start, regenerate, reset, isRunning, isRegenerating } = useGenerationPipeline();
 
     return (
         <div className="min-h-screen bg-background relative">
@@ -45,13 +45,16 @@ export default function GeneratePage() {
                     )}
 
                     {/* Pipeline Status */}
-                    {state.step !== "idle" && state.step !== "complete" && (
+                    {state.step !== "idle" && state.step !== "complete" && state.step !== "error" && (
                         <PipelineStatus
                             step={state.step}
                             researchStatus={state.researchStatus}
                             youtubeStatus={state.youtubeStatus}
                             generationStatus={state.generationStatus}
                             error={state.error}
+                            hasResearchData={!!state.research}
+                            hasYouTubeData={!!state.youtube}
+                            hasGenerationData={!!state.generation}
                         />
                     )}
 
@@ -72,7 +75,7 @@ export default function GeneratePage() {
                             <ResultsDashboard
                                 data={state.generation}
                                 onRegenerate={regenerate}
-                                isRegenerating={state.generationStatus === "Regenerating..."}
+                                isRegenerating={isRegenerating}
                             />
 
                             <div className="text-center pt-4 pb-8">
