@@ -127,8 +127,34 @@ Return a JSON object:
     {"timestamp": "3:45", "title": "Chapter title here"}
   ],
   "descriptionSEOKeywords": ["keyword1", "keyword2", "keyword3"],
-  "reasoningNotes": "Brief notes on description strategy and chapter choices"
+  "reasoningNotes": "Brief notes on description strategy and chapter choices",
+  "descriptionScore": {
+    "hookQuality": 0-25,
+    "structuralMatch": 0-25,
+    "seoIntegration": 0-25,
+    "humanVoice": 0-25,
+    "total": 0-100
+  },
+  "chapterScore": {
+    "specificityAvg": 0-25,
+    "activeVoice": 0-25,
+    "noBannedPatterns": 0-25,
+    "miniHookQuality": 0-25,
+    "total": 0-100
+  }
 }
+
+## SELF-SCORING RULES
+- Score your own description and chapters honestly using the dimensions above
+- "total" MUST equal the sum of the 4 dimension scores
+- hookQuality: Does the first 150 chars create genuine curiosity? Not "In this episode..."
+- structuralMatch: Does it match the channel's existing format (if pattern data provided)?
+- seoIntegration: Are keywords naturally woven in, not stuffed?
+- humanVoice: Does it sound like a real person wrote it?
+- specificityAvg: Do chapter titles contain specific details, not vague labels?
+- activeVoice: Do chapter titles use strong active verbs?
+- noBannedPatterns: Zero em dashes, arrows, parentheticals, semicolons?
+- miniHookQuality: Would someone skip to each chapter based on its title alone?
 
 ## CRITICAL RULES
 - Return ONLY the JSON object. No other text.

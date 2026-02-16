@@ -1,7 +1,13 @@
-import { openai, RESEARCH_MODEL } from "@/lib/openai";
+import { generateText, stepCountIs } from "ai";
+import { researchModel } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
+import { researchOutputSchema } from "@/lib/schemas/research-output";
 
 export const maxDuration = 60;
+
+function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: unknown) {
+  controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,9 +25,9 @@ export async function POST(request: Request) {
       "no external guest",
       "hosts only",
       "host-only",
-      "solo episode"
+      "solo episode",
     ];
-    const hasNoGuest = noGuestPatterns.some(pattern =>
+    const hasNoGuest = noGuestPatterns.some((pattern) =>
       guestName.toLowerCase().includes(pattern)
     );
 
@@ -29,11 +35,11 @@ export async function POST(request: Request) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "status", message: "No external guest - using topic-based generation..." })}\n\n`)
-          );
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: "No external guest - using topic-based generation...",
+          });
 
-          // Return minimal research object for no-guest episodes
           const noGuestResearch = {
             guest: {
               name: guestName,
@@ -45,14 +51,14 @@ export async function POST(request: Request) {
               guestTier: {
                 tier: 3,
                 reasoning: "No external guest - episode is topic-driven",
-                youtubeRecommendation: "TOPIC-ONLY, drop guest from YouTube title"
-              }
+                youtubeRecommendation: "TOPIC-ONLY, drop guest from YouTube title",
+              },
             },
             brand: {
               podcastName: podcastName,
               titleFormat: "Topic-driven episodes",
               voiceDescription: "Based on transcript content",
-              audienceProfile: targetAudience || "General audience interested in discussed topics"
+              audienceProfile: targetAudience || "General audience interested in discussed topics",
             },
             transcript: {
               topClaims: [],
@@ -60,17 +66,15 @@ export async function POST(request: Request) {
               emotionalMoments: [],
               clickableMoment: "",
               topicSegments: [],
-              trendingKeywords: []
+              trendingKeywords: [],
             },
             trendingTopics: [],
-            searchQueriesUsed: []
+            searchQueriesUsed: [],
           };
 
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "complete", data: noGuestResearch })}\n\n`)
-          );
+          sendSSE(controller, encoder, { type: "complete", data: noGuestResearch });
           controller.close();
-        }
+        },
       });
 
       return new Response(stream, {
@@ -96,66 +100,110 @@ export async function POST(request: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send initial status
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "status", message: "Starting research..." })}\n\n`)
-          );
-
-          const response = await openai.responses.create({
-            model: RESEARCH_MODEL,
-            instructions: systemPrompt,
-            input: userPrompt,
-            tools: [{ type: "web_search_preview" }],
-            stream: true,
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: `Researching ${guestName}...`,
           });
 
-          let fullText = "";
+          // Use generateText with web search tool — research needs web_search
+          // which is OpenAI-specific, so we use generateText and parse the JSON
+          const result = await generateText({
+            model: researchModel,
+            system: systemPrompt,
+            prompt: userPrompt,
+            tools: {
+              web_search_preview: {
+                type: "provider-defined",
+                id: "openai.web_search_preview",
+              } as any,
+            },
+            stopWhen: stepCountIs(5),
+          });
 
-          for await (const event of response) {
-            if (event.type === "response.output_text.delta") {
-              fullText += event.delta;
-            }
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: "Parsing research results...",
+          });
 
-            if (event.type === "response.created") {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: "status", message: `Searching for ${guestName}...` })}\n\n`
-                )
-              );
-            }
-
-            if (
-              event.type === "response.output_item.added" &&
-              "type" in event.item &&
-              event.item.type === "web_search_call"
-            ) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: "status", message: "Searching the web..." })}\n\n`
-                )
-              );
+          // Extract JSON from the response text using balanced-brace scanning
+          const candidates: string[] = [];
+          for (let si = 0; si < result.text.length; si++) {
+            if (result.text[si] !== "{") continue;
+            let depth = 0;
+            let inString = false;
+            for (let j = si; j < result.text.length; j++) {
+              const ch = result.text[j];
+              if (inString) {
+                if (ch === "\\") {
+                  j++; // skip escaped character
+                } else if (ch === '"') {
+                  inString = false;
+                }
+              } else {
+                if (ch === '"') {
+                  inString = true;
+                } else if (ch === "{") {
+                  depth++;
+                } else if (ch === "}") {
+                  depth--;
+                  if (depth === 0) {
+                    candidates.push(result.text.slice(si, j + 1));
+                    si = j; // advance outer loop past this match
+                    break;
+                  }
+                }
+              }
             }
           }
+          let parsed: any = null;
+          for (const candidate of candidates) {
+            try {
+              parsed = JSON.parse(candidate);
+              break;
+            } catch {
+              continue;
+            }
+          }
+          if (!parsed) {
+            sendSSE(controller, encoder, {
+              type: "error",
+              message: "Failed to parse research output",
+            });
+            controller.close();
+            return;
+          }
 
-          // Parse the JSON from the response
-          const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "complete", data: parsed })}\n\n`)
-            );
+          // Validate with Zod schema to catch malformed data (e.g., tier as string)
+          const validated = researchOutputSchema.safeParse(parsed);
+          if (validated.success) {
+            sendSSE(controller, encoder, { type: "complete", data: validated.data });
           } else {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ type: "error", message: "Failed to parse research output" })}\n\n`
-              )
+            console.warn(
+              "[Research] Zod validation failed, attempting fix:",
+              validated.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)
             );
+            // Fix common issues: tier as string instead of number
+            if (parsed.guest?.guestTier?.tier && typeof parsed.guest.guestTier.tier === "string") {
+              const tierMatch = String(parsed.guest.guestTier.tier).match(/\d/);
+              parsed.guest.guestTier.tier = tierMatch ? parseInt(tierMatch[0]) : 3;
+            }
+            const revalidated = researchOutputSchema.safeParse(parsed);
+            if (revalidated.success) {
+              sendSSE(controller, encoder, { type: "complete", data: revalidated.data });
+            } else {
+              console.error(
+                "[Research] Re-validation failed after fixes:",
+                revalidated.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`)
+              );
+              sendSSE(controller, encoder, {
+                type: "error",
+                message: "Research output failed schema validation",
+              });
+            }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : "Research failed";
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "error", message })}\n\n`)
-          );
+          sendSSE(controller, encoder, { type: "error", message });
         } finally {
           controller.close();
         }

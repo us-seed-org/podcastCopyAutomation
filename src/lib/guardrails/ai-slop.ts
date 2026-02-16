@@ -1,0 +1,68 @@
+export interface GuardrailResult {
+  passed: boolean;
+  violations: string[];
+}
+
+const BANNED_PUNCTUATION: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /\u2014/, label: "Em dash (\u2014)" },
+  { pattern: /;/, label: "Semicolon" },
+  { pattern: /!.*!/, label: "Multiple exclamation marks" },
+  { pattern: /\u2013/, label: "En dash (\u2013)" },
+  { pattern: /\u2192|\u279C|\u2794/, label: "Arrow character" },
+];
+
+const BANNED_PHRASES: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /\bdelve\b/i, label: '"delve"' },
+  { pattern: /\bdive deep\b/i, label: '"dive deep"' },
+  { pattern: /\bunpack\b/i, label: '"unpack"' },
+  { pattern: /\blandscape\b/i, label: '"landscape"' },
+  { pattern: /\bparadigm shift\b/i, label: '"paradigm shift"' },
+  { pattern: /\bwhy it matters\b/i, label: '"Why It Matters"' },
+  { pattern: /\bwhy you should care\b/i, label: '"Why You Should Care"' },
+  { pattern: /\bwhat you need to know\b/i, label: '"What You Need to Know"' },
+  { pattern: /\bwhat comes next\b/i, label: '"What Comes Next"' },
+  { pattern: /\bwhat it means for\b/i, label: '"What It Means For"' },
+  { pattern: /\bare here\b/i, label: '"Are Here" (generic announcement)' },
+  { pattern: /\bhas arrived\b/i, label: '"Has Arrived"' },
+  { pattern: /\bjust changed everything\b/i, label: '"Just Changed Everything"' },
+  { pattern: /\bhere'?s what they'?re not telling you\b/i, label: '"Here\'s What They\'re Not Telling You"' },
+  { pattern: /& co\./i, label: '"& Co."' },
+  { pattern: /\bwrote their own\b/i, label: '"Wrote Their Own" (anthropomorphizing)' },
+];
+
+// Check for keyword dump patterns: 3+ topics with commas and &
+const KEYWORD_DUMP_PATTERN = /[A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)*(?:\s*(?:,|&)\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)*)+/;
+
+function truncateText(text: string, maxLength = 100): string {
+  return text.length > maxLength ? text.slice(0, maxLength) + "\u2026" : text;
+}
+
+export function checkAiSlop(texts: string[]): GuardrailResult {
+  const violations: string[] = [];
+
+  for (const text of texts) {
+    for (const { pattern, label } of BANNED_PUNCTUATION) {
+      if (pattern.test(text)) {
+        violations.push(`"${truncateText(text)}" contains banned punctuation: ${label}`);
+      }
+    }
+
+    for (const { pattern, label } of BANNED_PHRASES) {
+      if (pattern.test(text)) {
+        violations.push(`"${truncateText(text)}" contains banned phrase: ${label}`);
+      }
+    }
+
+    if (KEYWORD_DUMP_PATTERN.test(text)) {
+      violations.push(`"${truncateText(text)}" looks like a keyword dump (3+ comma-separated topics)`);
+    }
+
+    // Double question check
+    const questionMarks = (text.match(/\?/g) || []).length;
+    if (questionMarks >= 2) {
+      violations.push(`"${truncateText(text)}" contains double questions (${questionMarks} question marks)`);
+    }
+  }
+
+  return { passed: violations.length === 0, violations };
+}

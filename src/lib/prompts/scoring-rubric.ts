@@ -80,6 +80,52 @@ perform as well as the calibration example, it CANNOT score as high.
 - WHY: Vague ("us" who?), em dash, anthropomorphizing cliché,
   no stakes, sounds like a tech blog, wouldn't stop anyone scrolling
 
+### Per-Dimension Calibration Table
+
+Use this table to calibrate EACH dimension score. These are the ground-truth
+per-dimension breakdowns for the calibration benchmarks above.
+
+| Title (Total) | CG /20 | AS /15 | ET /15 | TK /10 | SP /10 | CC /10 | WB /10 | FL /5 | TC /5 |
+|---|---|---|---|---|---|---|---|---|---|
+| Nuclear War Expert: 72 Min... (95) | 19 | 14 | 15 | 9 | 10 | 9 | 9 | 5 | 5 |
+| What Alcohol Does to Body... (90) | 18 | 12 | 14 | 9 | 9 | 9 | 9 | 5 | 5 |
+| Sam Altman \| Future of AI... (85) | 15 | 15 | 11 | 9 | 8 | 7 | 10 | 5 | 5 |
+| Peter Attia: 4 Pillars... (78) | 14 | 12 | 10 | 7 | 9 | 8 | 9 | 5 | 4 |
+| Why Everyone Is Talking... (70) | 12 | 5 | 10 | 9 | 4 | 10 | 10 | 5 | 5 |
+| AI Agents, Robot CEOs &... (55) | 10 | 3 | 8 | 7 | 3 | 9 | 7 | 4 | 4 |
+
+**HOW TO USE THIS TABLE:**
+- Before assigning a dimension score, find the benchmark title closest in
+  quality for THAT dimension and use its score as your anchor.
+- A curiosityGap of 16+ requires specificity comparable to "72 Minutes to
+  Wipe Out 60% of Humans." Generic topic questions with no specific claim
+  or number max at 12.
+- An authoritySignal of 12+ requires a name or credential that a general
+  audience would instantly recognize and be impressed by. Niche credentials
+  with no topic authority max at 5.
+- An emotionalTrigger of 12+ requires a visceral gut reaction (fear of death,
+  outrage, shock). If the reaction is merely "concern" or "interesting," max 9.
+- A specificity of 8+ requires concrete numbers, percentages, or timeframes.
+  "The future" or "everything" = max 3.
+
+### Hard Dimension Caps (NON-NEGOTIABLE)
+
+These caps override any other scoring logic. If a condition is true, the
+dimension score CANNOT exceed the stated maximum, period.
+
+| Condition | Capped Dimension | Max Score |
+|---|---|---|
+| Generic topic with no specific claim, number, or mechanism | Curiosity Gap | 12 |
+| Emotional reaction is "concern" or "interesting," not visceral shock/fear/outrage | Emotional Trigger | 9 |
+| No specific number, percentage, timeframe, or mechanism named | Specificity | 4 |
+| Only broad-category keyword (e.g., just "AI" not "AI layoffs" or "Ozempic") | Trending Keyword | 5 |
+| Tier 3 guest with no inherent topic authority | Authority Signal | 5 |
+| First 5 words do not independently create intrigue (the hook is buried) | Front-Load Hook | 3 |
+
+**ENFORCEMENT**: After scoring each dimension, check each cap condition.
+If a cap applies, reduce the score to the cap value. This is mechanical,
+not subjective — if the title says "AI" but not a specific AI trend, TK cap is 5.
+
 ### Scoring Dimensions (same weights, but CALIBRATED):
 
 | Dimension | Points | The REAL test |
@@ -94,8 +140,32 @@ perform as well as the calibration example, it CANNOT score as high.
 | Front-Load | /5 | First 5 words must create the hook. If the interesting part is at the end, max 2. |
 | Thumbnail Complement | /5 | Does it add info that a face+emotion thumbnail doesn't already convey? |
 
-### THE HONESTY CHECK
-After scoring, ask: "If this title appeared next to the 95-score calibration
-example in someone's feed, would it compete for the click?"
-If no, your score is too high. Reduce by 10-15 points.
+### THE HONESTY CHECK (MANDATORY — 3 STEPS)
+
+**Step 1: Upward comparison**
+Ask: "If this title appeared next to the 95-score calibration example in
+someone's feed, would it compete for the click?"
+If no, the score CANNOT be above 70.
+
+**Step 2: Downward comparison (CRITICAL — this prevents score inflation)**
+Check if the title shares energy, structure, or vagueness with any LOW-scoring
+benchmark (70 and below). Specifically:
+- Does it resemble "Why Everyone Is Talking About AI Right Now" (70)?
+  → Vague topic, no specific claim, empty urgency
+- Does it resemble "AI Agents, Robot CEOs & The End of..." (55)?
+  → Buzzword dump, conference panel energy
+- Does it resemble "AI CEOs? Could a Model Run...Why It Matters" (50)?
+  → Double question, hedging, filler tail
+- Does it resemble "An AI Agent Emailed Us — They Wrote..." (40)?
+  → Vague, anthropomorphizing cliche, no stakes
+
+If the title shares the ENERGY of a low-scoring benchmark, cap the total
+at that benchmark's score + 8 points. A title that resembles the 55-score
+example cannot score above 63, regardless of dimension scores.
+
+**Step 3: Sum sanity check**
+After dimension scoring AND applying hard caps AND the comparisons above,
+verify the total. If the total exceeds the nearest calibration benchmark
+by more than 5 points, you MUST justify which specific quality makes it
+better than the benchmark, or reduce the score to benchmark + 5.
 `;

@@ -1,4 +1,5 @@
-import { openai, GENERATION_MODEL } from "@/lib/openai";
+import { generateObject, generateText } from "ai";
+import { generationModel, scoringModel } from "@/lib/ai";
 import {
   buildGenerationSystemPrompt,
   buildGenerationUserPrompt,
@@ -15,103 +16,60 @@ import {
   buildDescriptionChapterSystemPrompt,
   buildDescriptionChapterUserPrompt,
 } from "@/lib/prompts/description-chapter-system";
+import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
+import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
+import { descriptionChapterOutputSchema } from "@/lib/schemas/description-chapter-output";
+import { descriptionAnalysisOutputSchema } from "@/lib/schemas/description-analysis-output";
+import { checkAiSlop } from "@/lib/guardrails/ai-slop";
+import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
+import { checkChapterFormat } from "@/lib/guardrails/chapter-format";
 
-export const maxDuration = 300; // 5 passes now
+export const maxDuration = 300;
 
-function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: unknown) {
+const REWRITE_THRESHOLD = 65;
+const MAX_REWRITE_ATTEMPTS = 3;
+const DESC_REWRITE_THRESHOLD = 70;
+
+function sendSSE(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  data: unknown
+) {
   controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
 }
 
-async function callModel(instructions: string, input: string, tools?: unknown[]) {
-  const opts: Record<string, unknown> = {
-    model: GENERATION_MODEL,
-    instructions,
-    input,
-  };
-  if (tools) opts.tools = tools;
+function getAllTitleTexts(generated: any): string[] {
+  const titles: string[] = [];
+  for (const t of generated.youtubeTitles || []) titles.push(t.title);
+  for (const t of generated.spotifyTitles || []) titles.push(t.title);
+  return titles;
+}
 
-  const response = await openai.responses.create(opts as any);
-  const text = response.output_text || "";
-
-  console.log("[callModel] Raw response length:", text.length);
-  console.log("[callModel] Raw response preview:", text.slice(0, 200));
-
-  // Try to extract JSON from markdown code blocks first
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    try {
-      const parsed = JSON.parse(codeBlockMatch[1].trim());
-      console.log("[callModel] Successfully parsed JSON from code block");
-      return parsed;
-    } catch (parseErr) {
-      console.warn("[callModel] Failed to parse code block content, falling back to regex");
-    }
-  }
-
-  // Brace-depth JSON extraction — properly handles nested objects and strings
-  const startIdx = text.indexOf('{');
-  if (startIdx === -1) {
-    console.warn("[callModel] No '{' found in response");
-    console.warn("[callModel] Full response:", text);
-    return null;
-  }
-
+function extractFirstJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
   let depth = 0;
   let inString = false;
-  let escapeNext = false;
-
-  for (let i = startIdx; i < text.length; i++) {
-    const char = text[i];
-
-    if (escapeNext) {
-      escapeNext = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      escapeNext = true;
-      continue;
-    }
-
-    if (char === '"' && !inString) {
-      inString = true;
-      continue;
-    }
-
-    if (char === '"' && inString) {
-      inString = false;
-      continue;
-    }
-
-    if (!inString) {
-      if (char === '{') {
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\\" ) {
+        i++; // skip escaped character
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === "{") {
         depth++;
-      } else if (char === '}') {
+      } else if (ch === "}") {
         depth--;
-        if (depth === 0) {
-          try {
-            const parsed = JSON.parse(text.slice(startIdx, i + 1));
-            console.log("[callModel] Successfully parsed JSON via brace-depth extraction");
-            return parsed;
-          } catch {
-            // Not valid JSON, continue searching
-          }
-        }
+        if (depth === 0) return text.slice(start, i + 1);
       }
     }
   }
-
-  // Final safety-net: try parsing whatever we found
-  console.warn("[callModel] Iterative extraction failed, attempting raw fallback");
-  try {
-    const parsed = JSON.parse(text.slice(startIdx));
-    console.log("[callModel] Fallback JSON.parse succeeded");
-    return parsed;
-  } catch (parseErr) {
-    console.error("[callModel] JSON parse error:", parseErr);
-    console.error("[callModel] Full response:", text.slice(0, 500));
-    return null;
-  }
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -120,22 +78,47 @@ export async function POST(request: Request) {
     const { research, youtubeAnalysis, transcript, episodeDescription } = body;
 
     if (!research || !transcript || !episodeDescription) {
-      return Response.json({ error: "Missing required fields" }, { status: 400 });
+      return Response.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const researchStr = typeof research === "string" ? research : JSON.stringify(research, null, 2);
+          const researchStr =
+            typeof research === "string"
+              ? research
+              : JSON.stringify(research, null, 2);
           const ytStr = youtubeAnalysis
-            ? typeof youtubeAnalysis === "string" ? youtubeAnalysis : JSON.stringify(youtubeAnalysis, null, 2)
+            ? typeof youtubeAnalysis === "string"
+              ? youtubeAnalysis
+              : JSON.stringify(youtubeAnalysis, null, 2)
             : "No YouTube channel data available.";
+
+          // Extract tier info for guardrails
+          let researchObj: any = {};
+          try {
+            researchObj =
+              typeof research === "string" ? JSON.parse(research) : research;
+          } catch (parseErr) {
+            console.warn(
+              "[generate] Failed to parse research JSON:",
+              parseErr instanceof Error ? parseErr.message : parseErr
+            );
+          }
+          const guestName = researchObj?.guest?.name || "";
+          const guestTier = researchObj?.guest?.guestTier?.tier || 3;
+          const guestCredential =
+            researchObj?.guest?.authorityLabel || undefined;
 
           // === PASS 0: Analyze description patterns from prior videos ===
           let descriptionPatternStr: string | null = null;
 
-          const ytData = typeof youtubeAnalysis === "string" ? null : youtubeAnalysis;
+          const ytData =
+            typeof youtubeAnalysis === "string" ? null : youtubeAnalysis;
           const priorDescriptions: string[] = (ytData?.recentVideos || [])
             .map((v: any) => v.description)
             .filter((d: string) => d && d.length > 50);
@@ -146,27 +129,44 @@ export async function POST(request: Request) {
               message: `Analyzing ${priorDescriptions.length} prior video descriptions for patterns...`,
             });
 
-            const descAnalysis = await callModel(
-              buildDescriptionAnalysisSystemPrompt(),
-              buildDescriptionAnalysisUserPrompt(priorDescriptions)
-            );
+            try {
+              const descAnalysis = await generateObject({
+                model: generationModel,
+                schema: descriptionAnalysisOutputSchema,
+                system: buildDescriptionAnalysisSystemPrompt(),
+                prompt: buildDescriptionAnalysisUserPrompt(priorDescriptions),
+              });
 
-            if (descAnalysis) {
-              descriptionPatternStr = JSON.stringify(descAnalysis, null, 2);
+              descriptionPatternStr = JSON.stringify(
+                descAnalysis.object,
+                null,
+                2
+              );
               sendSSE(controller, encoder, {
                 type: "status",
                 message: "Description patterns extracted successfully.",
+              });
+            } catch (err) {
+              console.warn("[PASS 0] Description analysis failed:", err);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message:
+                  "Description analysis failed — using best practices.",
               });
             }
           } else {
             sendSSE(controller, encoder, {
               type: "status",
-              message: "No prior descriptions available — using best practices.",
+              message:
+                "No prior descriptions available — using best practices.",
             });
           }
 
           // === PASS 1: Generate titles ===
-          sendSSE(controller, encoder, { type: "status", message: "Generating title options..." });
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: "Generating title options...",
+          });
 
           const systemPrompt = buildGenerationSystemPrompt();
           const userPrompt = buildGenerationUserPrompt({
@@ -176,15 +176,82 @@ export async function POST(request: Request) {
             episodeDescription,
           });
 
-          const generated = await callModel(systemPrompt, userPrompt, [{ type: "web_search_preview" }]);
-          if (!generated) {
-            sendSSE(controller, encoder, { type: "error", message: "Failed to parse generation output" });
-            controller.close();
-            return;
+          let generated: any;
+          try {
+            const result = await generateObject({
+              model: generationModel,
+              schema: titleGenerationOutputSchema,
+              system: systemPrompt,
+              prompt: userPrompt,
+            });
+            generated = result.object;
+          } catch (err) {
+            // Fallback: try generateText and parse JSON manually
+            console.warn("[PASS 1] generateObject failed, falling back to generateText:", err);
+            const fallback = await generateText({
+              model: generationModel,
+              system: systemPrompt,
+              prompt: userPrompt,
+            });
+            const jsonStr = extractFirstJson(fallback.text);
+            if (!jsonStr) {
+              sendSSE(controller, encoder, {
+                type: "error",
+                message: "Failed to generate titles",
+              });
+              controller.close();
+              return;
+            }
+            generated = JSON.parse(jsonStr);
           }
 
-          // === PASS 2: Score titles independently ===
-          sendSSE(controller, encoder, { type: "status", message: "Scoring titles independently..." });
+          // Run guardrails on initial titles
+          const slopCheck = checkAiSlop(getAllTitleTexts(generated));
+          const tierCheck = checkTierCompliance(
+            guestName,
+            guestTier,
+            guestCredential,
+            (generated.youtubeTitles || []).map((t: any) => t.title)
+          );
+
+          if (!slopCheck.passed || !tierCheck.passed) {
+            const allViolations = [
+              ...slopCheck.violations,
+              ...tierCheck.violations,
+            ];
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Guardrail violations detected (${allViolations.length}), re-generating titles...`,
+            });
+
+            const violationFeedback = `## GUARDRAIL VIOLATIONS — FIX THESE
+
+The following violations were detected in your output. You MUST fix all of them:
+
+${allViolations.map((v) => `- ${v}`).join("\n")}
+
+Re-generate ALL titles, ensuring NONE of these violations remain.`;
+
+            try {
+              const fixResult = await generateObject({
+                model: generationModel,
+                schema: titleGenerationOutputSchema,
+                system: systemPrompt,
+                prompt: userPrompt + "\n\n" + violationFeedback,
+              });
+              generated = fixResult.object;
+            } catch {
+              // Keep original if fix attempt fails
+              console.warn("[PASS 1] Guardrail re-generation failed, keeping originals");
+            }
+          }
+
+          // === PASS 2: Score titles independently with Minimax M2.5 ===
+          sendSSE(controller, encoder, {
+            type: "status",
+            message:
+              "Scoring titles independently with cross-model evaluator...",
+          });
 
           const scoringPrompt = buildScoringSystemPrompt();
           const scoringInput = buildScoringUserPrompt({
@@ -192,64 +259,136 @@ export async function POST(request: Request) {
             research: researchStr,
           });
 
-          const scored = await callModel(scoringPrompt, scoringInput);
-
-          if (!scored) {
-            sendSSE(controller, encoder, { type: "status", message: "Scoring failed - continuing with generated titles without independent scoring" });
+          let scored: any = null;
+          try {
+            const scoreResult = await generateObject({
+              model: scoringModel,
+              schema: scoringOutputSchema,
+              system: scoringPrompt,
+              prompt: scoringInput,
+            });
+            scored = scoreResult.object;
+          } catch (err) {
+            console.warn("[PASS 2] Cross-model scoring failed, falling back to generation model:", err);
+            // Fallback to generation model for scoring
+            try {
+              const scoreResult = await generateObject({
+                model: generationModel,
+                schema: scoringOutputSchema,
+                system: scoringPrompt,
+                prompt: scoringInput,
+              });
+              scored = scoreResult.object;
+            } catch (err2) {
+              console.warn("[PASS 2] Scoring fallback also failed:", err2);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message:
+                  "Scoring failed — continuing with self-assessed scores",
+              });
+            }
           }
 
           // Merge scores onto generated titles
           if (scored) {
-            for (const section of ["youtubeTitles", "spotifyTitles"] as const) {
+            for (const section of [
+              "youtubeTitles",
+              "spotifyTitles",
+            ] as const) {
               if (generated[section] && scored[section]) {
-                generated[section] = generated[section].map((t: any, i: number) => ({
-                  ...t,
-                  score: scored[section]?.[i]?.score || t.score,
-                  scrollStopReason: scored[section]?.[i]?.scrollStopReason || t.scrollStopReason,
-                  platformNotes: scored[section]?.[i]?.platformNotes || t.platformNotes,
-                }));
+                generated[section] = generated[section].map(
+                  (t: any, i: number) => ({
+                    ...t,
+                    score: scored[section]?.[i]?.score || t.score,
+                    scrollStopReason:
+                      scored[section]?.[i]?.scrollStopReason ||
+                      t.scrollStopReason,
+                    platformNotes:
+                      scored[section]?.[i]?.platformNotes || t.platformNotes,
+                  })
+                );
               }
             }
             generated.tierClassification = scored.tierClassification;
           }
 
-          // === PASS 3: Rewrite any titles scoring below 75 ===
-          const weakYTIndices = (generated.youtubeTitles || [])
-            .map((t: any, i: number) => (t.score?.total || 0) < 75 ? i : -1)
-            .filter((i: number) => i !== -1);
-          const weakSPIndices = (generated.spotifyTitles || [])
-            .map((t: any, i: number) => (t.score?.total || 0) < 75 ? i : -1)
-            .filter((i: number) => i !== -1);
-          const weakYT = weakYTIndices.map((i: number) => generated.youtubeTitles[i]);
-          const weakSP = weakSPIndices.map((i: number) => generated.spotifyTitles[i]);
+          // === PASS 3: Iterative rewrite loop (up to 3 attempts) ===
+          for (
+            let attempt = 1;
+            attempt <= MAX_REWRITE_ATTEMPTS;
+            attempt++
+          ) {
+            const weakYTIndices = (generated.youtubeTitles || [])
+              .map((t: any, i: number) =>
+                (t.score?.total || 0) < REWRITE_THRESHOLD ? i : -1
+              )
+              .filter((i: number) => i !== -1);
+            const weakSPIndices = (generated.spotifyTitles || [])
+              .map((t: any, i: number) =>
+                (t.score?.total || 0) < REWRITE_THRESHOLD ? i : -1
+              )
+              .filter((i: number) => i !== -1);
+            const weakYT = weakYTIndices.map(
+              (i: number) => generated.youtubeTitles[i]
+            );
+            const weakSP = weakSPIndices.map(
+              (i: number) => generated.spotifyTitles[i]
+            );
 
-          if (weakYT.length > 0 || weakSP.length > 0) {
+            if (weakYT.length === 0 && weakSP.length === 0) {
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: `All titles passed threshold (${REWRITE_THRESHOLD}+).`,
+              });
+              break;
+            }
+
             sendSSE(controller, encoder, {
               type: "status",
-              message: `Rewriting ${weakYT.length + weakSP.length} weak title(s) with scoring feedback...`,
+              message: `Rewriting ${weakYT.length + weakSP.length} weak title(s) — attempt ${attempt}/${MAX_REWRITE_ATTEMPTS}...`,
             });
 
-            const feedback: Array<{ title: string; message: string; platform: string }> = [];
+            const feedback: Array<{
+              title: string;
+              message: string;
+              platform: string;
+            }> = [];
             for (const t of weakYT) {
-              const message = `YouTube: "${t.title}" scored ${t.score?.total}/100. Problems: low ${Object.entries(t.score || {})
-                  .filter(([k, v]) => k !== "total" && typeof v === "number" && v < 5)
-                  .map(([k]) => k).join(", ") || "overall quality"
-                }`;
-              feedback.push({ title: t.title, message, platform: "YouTube" });
+              const lowDims =
+                Object.entries(t.score || {})
+                  .filter(
+                    ([k, v]) =>
+                      k !== "total" && typeof v === "number" && (v as number) < 5
+                  )
+                  .map(([k]) => k)
+                  .join(", ") || "overall quality";
+              feedback.push({
+                title: t.title,
+                message: `YouTube: "${t.title}" scored ${t.score?.total}/100. Problems: low ${lowDims}`,
+                platform: "YouTube",
+              });
             }
             for (const t of weakSP) {
-              const message = `Spotify: "${t.title}" scored ${t.score?.total}/100. Problems: low ${Object.entries(t.score || {})
-                  .filter(([k, v]) => k !== "total" && typeof v === "number" && v < 5)
-                  .map(([k]) => k).join(", ") || "overall quality"
-                }`;
-              feedback.push({ title: t.title, message, platform: "Spotify" });
+              const lowDims =
+                Object.entries(t.score || {})
+                  .filter(
+                    ([k, v]) =>
+                      k !== "total" && typeof v === "number" && (v as number) < 5
+                  )
+                  .map(([k]) => k)
+                  .join(", ") || "overall quality";
+              feedback.push({
+                title: t.title,
+                message: `Spotify: "${t.title}" scored ${t.score?.total}/100. Problems: low ${lowDims}`,
+                platform: "Spotify",
+              });
             }
 
-            const rewriteInput = `## REWRITE REQUEST
+            const rewriteInput = `## REWRITE REQUEST (Attempt ${attempt}/${MAX_REWRITE_ATTEMPTS})
 
-The following titles were scored by an independent evaluator and FAILED (below 75/100):
+The following titles were scored by an independent evaluator and FAILED (below ${REWRITE_THRESHOLD}/100):
 
-${feedback.map(f => `${f.platform}: "${f.title}" — ${f.message}`).join("\n")}
+${feedback.map((f) => `${f.platform}: "${f.title}" — ${f.message}`).join("\n")}
 
 ## ORIGINAL RESEARCH
 ${researchStr}
@@ -263,120 +402,249 @@ ${episodeDescription}
 REWRITE these titles from scratch. Do NOT tweak the failed titles — start fresh with new angles.
 The failed titles tell you what DOESN'T work. Find a completely different approach.
 
-${weakYT.length > 0 ? "Generate 2 NEW YouTube titles (different angles from the failed ones)." : ""}
-${weakSP.length > 0 ? "Generate 2 NEW Spotify titles (different angles from the failed ones)." : ""}
+${weakYT.length > 0 ? `Generate ${weakYT.length} NEW YouTube ${weakYT.length === 1 ? "title" : "titles"} (different angles from the failed ones).` : ""}
+${weakSP.length > 0 ? `Generate ${weakSP.length} NEW Spotify ${weakSP.length === 1 ? "title" : "titles"} (different angles from the failed ones).` : ""}
 
-Return the same JSON structure. All titles MUST score 75+.`;
+Return the same JSON structure. Score honestly against the calibration benchmarks.`;
 
-            const rewritten = await callModel(systemPrompt, rewriteInput, [{ type: "web_search_preview" }]);
-
-            if (rewritten) {
-              // Validate rewrite counts match expected weak indices
-              if (weakYTIndices.length > 0 && rewritten.youtubeTitles?.length !== weakYTIndices.length) {
-                console.warn(`[Rewrite] YouTube title count mismatch: expected ${weakYTIndices.length}, got ${rewritten.youtubeTitles?.length || 0}`);
-              }
-              if (weakSPIndices.length > 0 && rewritten.spotifyTitles?.length !== weakSPIndices.length) {
-                console.warn(`[Rewrite] Spotify title count mismatch: expected ${weakSPIndices.length}, got ${rewritten.spotifyTitles?.length || 0}`);
-              }
-
-              const rewriteScored = await callModel(scoringPrompt, buildScoringUserPrompt({
-                generatedTitles: JSON.stringify(rewritten, null, 2),
-                research: researchStr,
-              }));
-
-              if (weakYTIndices.length > 0 && rewritten.youtubeTitles) {
-                generated.youtubeTitles = generated.youtubeTitles.map((original: any, i: number) => {
-                  const weakIndex = weakYTIndices.indexOf(i);
-                  if (weakIndex === -1) {
-                    return original;
-                  }
-                  const rewrittenItem = rewritten.youtubeTitles[weakIndex];
-                  if (!rewrittenItem) {
-                    console.warn(`[Rewrite] Missing rewritten item at index ${weakIndex} for YouTube`);
-                    return original;
-                  }
-                  return {
-                    ...rewrittenItem,
-                    score: rewriteScored?.youtubeTitles?.[weakIndex]?.score || rewrittenItem.score || original.score,
-                    rewritten: true,
-                  };
-                });
-              }
-              if (weakSPIndices.length > 0 && rewritten.spotifyTitles) {
-                generated.spotifyTitles = generated.spotifyTitles.map((original: any, i: number) => {
-                  const weakIndex = weakSPIndices.indexOf(i);
-                  if (weakIndex === -1) {
-                    return original;
-                  }
-                  const rewrittenItem = rewritten.spotifyTitles[weakIndex];
-                  if (!rewrittenItem) {
-                    console.warn(`[Rewrite] Missing rewritten item at index ${weakIndex} for Spotify`);
-                    return original;
-                  }
-                  return {
-                    ...rewrittenItem,
-                    score: rewriteScored?.spotifyTitles?.[weakIndex]?.score || rewrittenItem.score || original.score,
-                    rewritten: true,
-                  };
-                });
-              }
-              generated.rejectedTitles = [
-                ...(generated.rejectedTitles || []),
-                ...feedback.map(f => ({ title: f.title, rejectionReason: f.message })),
-                ...(rewritten.rejectedTitles || []),
-              ];
+            let rewritten: any = null;
+            try {
+              const rewriteResult = await generateObject({
+                model: generationModel,
+                schema: titleGenerationOutputSchema,
+                system: systemPrompt,
+                prompt: rewriteInput,
+              });
+              rewritten = rewriteResult.object;
+            } catch {
+              console.warn(`[PASS 3] Rewrite attempt ${attempt} failed`);
+              continue;
             }
+
+            // Run guardrails on rewritten titles
+            const rewriteSlopCheck = checkAiSlop(
+              getAllTitleTexts(rewritten)
+            );
+            const rewriteTierCheck = checkTierCompliance(
+              guestName,
+              guestTier,
+              guestCredential,
+              (rewritten.youtubeTitles || []).map((t: any) => t.title)
+            );
+
+            if (!rewriteSlopCheck.passed || !rewriteTierCheck.passed) {
+              console.warn(
+                `[PASS 3] Rewrite attempt ${attempt} has guardrail violations:`,
+                [...rewriteSlopCheck.violations, ...rewriteTierCheck.violations]
+              );
+              // Continue to scoring anyway — we'll try again next iteration
+            }
+
+            // Re-score rewritten titles
+            let rewriteScored: any = null;
+            try {
+              const scoreResult = await generateObject({
+                model: scoringModel,
+                schema: scoringOutputSchema,
+                system: scoringPrompt,
+                prompt: buildScoringUserPrompt({
+                  generatedTitles: JSON.stringify(rewritten, null, 2),
+                  research: researchStr,
+                }),
+              });
+              rewriteScored = scoreResult.object;
+            } catch {
+              console.warn(`[PASS 3] Re-scoring attempt ${attempt} failed with cross-model, trying generation model`);
+              try {
+                const scoreResult = await generateObject({
+                  model: generationModel,
+                  schema: scoringOutputSchema,
+                  system: scoringPrompt,
+                  prompt: buildScoringUserPrompt({
+                    generatedTitles: JSON.stringify(rewritten, null, 2),
+                    research: researchStr,
+                  }),
+                });
+                rewriteScored = scoreResult.object;
+              } catch {
+                console.warn(`[PASS 3] Re-scoring fallback also failed`);
+              }
+            }
+
+            // Merge rewritten titles into generated, replacing weak ones
+            if (weakYTIndices.length > 0 && rewritten.youtubeTitles) {
+              const ytReplacementCount = Math.min(
+                rewritten.youtubeTitles.length,
+                weakYTIndices.length
+              );
+              for (let ri = 0; ri < ytReplacementCount; ri++) {
+                const originalIndex = weakYTIndices[ri];
+                const rewrittenItem = rewritten.youtubeTitles[ri];
+                generated.youtubeTitles[originalIndex] = {
+                  ...rewrittenItem,
+                  score:
+                    rewriteScored?.youtubeTitles?.[ri]?.score ||
+                    rewrittenItem.score ||
+                    generated.youtubeTitles[originalIndex].score,
+                  rewritten: true,
+                };
+              }
+            }
+            if (weakSPIndices.length > 0 && rewritten.spotifyTitles) {
+              const spReplacementCount = Math.min(
+                rewritten.spotifyTitles.length,
+                weakSPIndices.length
+              );
+              for (let ri = 0; ri < spReplacementCount; ri++) {
+                const originalIndex = weakSPIndices[ri];
+                const rewrittenItem = rewritten.spotifyTitles[ri];
+                generated.spotifyTitles[originalIndex] = {
+                  ...rewrittenItem,
+                  score:
+                    rewriteScored?.spotifyTitles?.[ri]?.score ||
+                    rewrittenItem.score ||
+                    generated.spotifyTitles[originalIndex].score,
+                  rewritten: true,
+                };
+              }
+            }
+            generated.rejectedTitles = [
+              ...(generated.rejectedTitles || []),
+              ...feedback.map((f) => ({
+                title: f.title,
+                rejectionReason: f.message,
+              })),
+              ...(rewritten.rejectedTitles || []),
+            ];
           }
 
           // === PASS 4: Dedicated description + chapter generation ===
           sendSSE(controller, encoder, {
             type: "status",
-            message: "Generating descriptions and chapters with dedicated agent...",
+            message:
+              "Generating descriptions and chapters with dedicated agent...",
           });
 
           const winningTitles = {
-            youtube: (generated.youtubeTitles || []).map((t: any) => t.title),
-            spotify: (generated.spotifyTitles || []).map((t: any) => t.title),
+            youtube: (generated.youtubeTitles || []).map(
+              (t: any) => t.title
+            ),
+            spotify: (generated.spotifyTitles || []).map(
+              (t: any) => t.title
+            ),
           };
 
-          const descChapterResult = await callModel(
-            buildDescriptionChapterSystemPrompt(),
-            buildDescriptionChapterUserPrompt({
-              winningTitles,
-              research: researchStr,
-              transcript,
-              episodeDescription,
-              descriptionPattern: descriptionPatternStr,
-            })
-          );
+          let descChapterResult: any = null;
+          try {
+            const descResult = await generateObject({
+              model: generationModel,
+              schema: descriptionChapterOutputSchema,
+              system: buildDescriptionChapterSystemPrompt(),
+              prompt: buildDescriptionChapterUserPrompt({
+                winningTitles,
+                research: researchStr,
+                transcript,
+                episodeDescription,
+                descriptionPattern: descriptionPatternStr,
+              }),
+            });
+            descChapterResult = descResult.object;
+          } catch (err) {
+            console.warn("[PASS 4] generateObject for descriptions failed, falling back:", err);
+            try {
+              const fallback = await generateText({
+                model: generationModel,
+                system: buildDescriptionChapterSystemPrompt(),
+                prompt: buildDescriptionChapterUserPrompt({
+                  winningTitles,
+                  research: researchStr,
+                  transcript,
+                  episodeDescription,
+                  descriptionPattern: descriptionPatternStr,
+                }),
+              });
+              const descJsonStr = extractFirstJson(fallback.text);
+              if (descJsonStr) {
+                descChapterResult = JSON.parse(descJsonStr);
+              }
+            } catch {
+              console.warn("[PASS 4] Description fallback also failed");
+            }
+          }
 
-          // Merge description + chapter results onto the generated output
           if (descChapterResult) {
-            generated.youtubeDescription = descChapterResult.youtubeDescription || generated.youtubeDescription;
-            generated.spotifyDescription = descChapterResult.spotifyDescription || generated.spotifyDescription;
-            generated.chapters = descChapterResult.chapters || generated.chapters;
-            generated.descriptionScore = descChapterResult.descriptionScore || null;
-            generated.chapterScore = descChapterResult.chapterScore || null;
-
-            // === PASS 5: Rewrite weak descriptions/chapters if scores are low ===
-            const descScore = descChapterResult.descriptionScore?.total || 0;
-            const chapScore = descChapterResult.chapterScore?.total || 0;
-
-            if (descScore < 70 || chapScore < 70) {
+            // Run chapter format guardrail
+            const chapterCheck = checkChapterFormat(
+              descChapterResult.chapters || []
+            );
+            if (!chapterCheck.passed) {
               sendSSE(controller, encoder, {
                 type: "status",
-                message: `Rewriting ${descScore < 70 ? "description" : ""}${descScore < 70 && chapScore < 70 ? " and " : ""}${chapScore < 70 ? "chapters" : ""} (scored ${descScore}/100, ${chapScore}/100)...`,
+                message: `Chapter format violations (${chapterCheck.violations.length}), re-generating...`,
               });
 
-              const rewriteDescInput = `## REWRITE REQUEST
+              try {
+                const fixResult = await generateObject({
+                  model: generationModel,
+                  schema: descriptionChapterOutputSchema,
+                  system: buildDescriptionChapterSystemPrompt(),
+                  prompt:
+                    buildDescriptionChapterUserPrompt({
+                      winningTitles,
+                      research: researchStr,
+                      transcript,
+                      episodeDescription,
+                      descriptionPattern: descriptionPatternStr,
+                    }) +
+                    "\n\n## CHAPTER FORMAT VIOLATIONS — FIX THESE\n\n" +
+                    chapterCheck.violations
+                      .map((v) => `- ${v}`)
+                      .join("\n") +
+                    "\n\nFix ALL violations above. Every chapter title must be 25-50 chars with no em dashes, arrows, or parentheticals.",
+                });
+                descChapterResult = fixResult.object;
+              } catch {
+                console.warn("[PASS 4] Chapter fix re-generation failed");
+              }
+            }
+
+            generated.youtubeDescription =
+              descChapterResult.youtubeDescription ||
+              generated.youtubeDescription;
+            generated.spotifyDescription =
+              descChapterResult.spotifyDescription ||
+              generated.spotifyDescription;
+            generated.chapters =
+              descChapterResult.chapters || generated.chapters;
+            generated.descriptionScore =
+              descChapterResult.descriptionScore || null;
+            generated.chapterScore =
+              descChapterResult.chapterScore || null;
+
+            // === PASS 5: Rewrite weak descriptions/chapters if scores are low ===
+            const descScore =
+              descChapterResult.descriptionScore?.total || 0;
+            const chapScore =
+              descChapterResult.chapterScore?.total || 0;
+
+            if (
+              descScore < DESC_REWRITE_THRESHOLD ||
+              chapScore < DESC_REWRITE_THRESHOLD
+            ) {
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: `Rewriting ${descScore < DESC_REWRITE_THRESHOLD ? "description" : ""}${descScore < DESC_REWRITE_THRESHOLD && chapScore < DESC_REWRITE_THRESHOLD ? " and " : ""}${chapScore < DESC_REWRITE_THRESHOLD ? "chapters" : ""} (scored ${descScore}/100, ${chapScore}/100)...`,
+              });
+
+              const rewriteDescPrompt = `## REWRITE REQUEST
 
 The descriptions/chapters scored poorly and need rewriting.
 
 Description score: ${descScore}/100
-${descScore < 70 ? `Problems: ${JSON.stringify(descChapterResult.descriptionScore)}` : "Description OK."}
+${descScore < DESC_REWRITE_THRESHOLD ? `Problems: ${JSON.stringify(descChapterResult.descriptionScore)}` : "Description OK."}
 
-Chapter score: ${chapScore}/100  
-${chapScore < 70 ? `Problems: ${JSON.stringify(descChapterResult.chapterScore)}` : "Chapters OK."}
+Chapter score: ${chapScore}/100
+${chapScore < DESC_REWRITE_THRESHOLD ? `Problems: ${JSON.stringify(descChapterResult.chapterScore)}` : "Chapters OK."}
 
 Current YouTube description:
 ${descChapterResult.youtubeDescription || "None"}
@@ -401,41 +669,54 @@ ${transcript.slice(0, 8000)}
 ${episodeDescription}
 
 REWRITE from scratch. Focus on:
-${descScore < 70 ? "- YouTube description: hook paragraph must sound like a Wired article, NOT 'In this episode...'" : ""}
-${chapScore < 70 ? "- Chapters: every title needs an active verb, specific detail, NO em dashes/arrows/parenthetical fillers" : ""}
+${descScore < DESC_REWRITE_THRESHOLD ? "- YouTube description: hook paragraph must sound like a Wired article, NOT 'In this episode...'" : ""}
+${chapScore < DESC_REWRITE_THRESHOLD ? "- Chapters: every title needs an active verb, specific detail, NO em dashes/arrows/parenthetical fillers" : ""}
 
-Return the same JSON structure.`;
+Return the same JSON structure with updated scores.`;
 
-              const rewrittenDesc = await callModel(
-                buildDescriptionChapterSystemPrompt(),
-                rewriteDescInput
-              );
+              try {
+                const rewriteDescResult = await generateObject({
+                  model: generationModel,
+                  schema: descriptionChapterOutputSchema,
+                  system: buildDescriptionChapterSystemPrompt(),
+                  prompt: rewriteDescPrompt,
+                });
+                const rewrittenDesc = rewriteDescResult.object;
 
-              if (rewrittenDesc) {
-                // Only update each platform if the AI provided a rewritten version
-                // This prevents overwriting a good YouTube description when only Spotify was weak (or vice versa)
                 if (rewrittenDesc.youtubeDescription) {
-                  generated.youtubeDescription = rewrittenDesc.youtubeDescription;
+                  generated.youtubeDescription =
+                    rewrittenDesc.youtubeDescription;
                 }
                 if (rewrittenDesc.spotifyDescription) {
-                  generated.spotifyDescription = rewrittenDesc.spotifyDescription;
+                  generated.spotifyDescription =
+                    rewrittenDesc.spotifyDescription;
                 }
-                if (chapScore < 70 && rewrittenDesc.chapters) {
+                if (
+                  chapScore < DESC_REWRITE_THRESHOLD &&
+                  rewrittenDesc.chapters
+                ) {
                   generated.chapters = rewrittenDesc.chapters;
                 }
-                if (rewrittenDesc.youtubeDescription || rewrittenDesc.spotifyDescription) {
-                  generated.descriptionScore = rewrittenDesc.descriptionScore || generated.descriptionScore;
+                if (rewrittenDesc.descriptionScore) {
+                  generated.descriptionScore =
+                    rewrittenDesc.descriptionScore;
                 }
-                if (chapScore < 70 && rewrittenDesc.chapters) {
-                  generated.chapterScore = rewrittenDesc.chapterScore || generated.chapterScore;
+                if (
+                  chapScore < DESC_REWRITE_THRESHOLD &&
+                  rewrittenDesc.chapterScore
+                ) {
+                  generated.chapterScore = rewrittenDesc.chapterScore;
                 }
+              } catch {
+                console.warn("[PASS 5] Description rewrite failed");
               }
             }
           }
 
           sendSSE(controller, encoder, { type: "complete", data: generated });
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Generation failed";
+          const message =
+            err instanceof Error ? err.message : "Generation failed";
           sendSSE(controller, encoder, { type: "error", message });
         } finally {
           controller.close();
@@ -444,10 +725,15 @@ Return the same JSON structure.`;
     });
 
     return new Response(stream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
+    const message =
+      err instanceof Error ? err.message : "Internal server error";
     return Response.json({ error: message }, { status: 500 });
   }
 }

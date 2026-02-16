@@ -15,7 +15,35 @@ You will receive:
 1. **You did NOT write these titles** — you have zero ego investment. Be honest.
 2. **Compare to calibration** — if it wouldn't compete with the 95-score example, it cannot score above 70.
 3. **Apply the tier rules strictly** — if tier=3 and the title mentions the guest, that's an automatic fail.
-4. **Be brutal** — most titles should score 60-75. Only truly exceptional titles deserve 80+.
+4. **Be calibrated** — average AI-generated titles score 55-65. Good titles that follow the rules well score 65-78. Only truly exceptional titles (calibration-benchmark level) deserve 80+.
+5. **Most AI-generated titles are mediocre** — your default assumption should be that a title scores 55-65 until proven otherwise. The burden of proof is on the title to earn a high score, not on you to justify a low one.
+6. **Use the per-dimension calibration table** — do NOT guess what a dimension score "means." Look up the benchmark closest in quality for that dimension and use its score as your anchor.
+
+## MANDATORY SCORING PROCESS (follow for EACH title)
+
+### Step 1: Identify nearest calibration benchmark
+Which calibration benchmark (95, 90, 85, 78, 70, 55, 50, 45, 40, 30) has the
+most similar ENERGY and QUALITY? Note it in platformNotes.
+
+### Step 2: Check for low-benchmark resemblance
+Does this title share structure, vagueness, or energy with any benchmark
+scoring 70 or below? Specifically check:
+- Vague topic + no specific claim → resembles 70 ("Why Everyone Is Talking...")
+- Buzzword dump or list of topics → resembles 55 ("AI Agents, Robot CEOs &...")
+- Double question or hedging → resembles 50 ("AI CEOs? Could a Model...Why It Matters")
+- Vague + anthropomorphizing/cliche → resembles 40 ("An AI Agent Emailed Us—They Wrote...")
+If resemblance is found, the total CANNOT exceed that benchmark's score + 8.
+
+### Step 3: Score each dimension using the per-dimension calibration table
+For each of the 9 dimensions:
+a) Find the calibration benchmark closest in quality FOR THIS DIMENSION
+b) Use that benchmark's score as your anchor (within ±2 points)
+c) Check hard dimension caps — if a cap condition applies, enforce it
+
+### Step 4: Verify total against nearest benchmark
+Sum the dimension scores. If total exceeds the benchmark identified in Step 1
+by more than 5 points, either identify a specific concrete quality that makes
+this title BETTER, or reduce the total to benchmark + 5.
 
 ${SCORING_RUBRIC}
 
@@ -64,8 +92,8 @@ Return a JSON object with this exact structure:
     }
   ],
   "tierClassification": {
-    "tier": "number — from research",
-    "appliedCorrectly": "boolean — did the titles follow the tier rules?",
+    "tier": "<1|2|3>",
+    "appliedCorrectly": "<true|false>",
     "verification": "Explain specifically how titles follow or violate the tier constraint"
   }
 }
@@ -97,7 +125,14 @@ ${input.generatedTitles.trim()}
 
 ${input.research.trim()}
 
-Now evaluate these titles against the calibration benchmarks. Be BRUTAL. If a title wouldn't compete with the 95-score example for clicks, it cannot score above 70.
+Now evaluate these titles. Follow the MANDATORY SCORING PROCESS for each title.
+
+CRITICAL REMINDERS:
+- Default assumption: AI-generated titles score 55-65. The title must EARN higher.
+- Identify which calibration benchmark each title most resembles BEFORE scoring.
+- Check for LOW-benchmark resemblance (70, 55, 50, 45, 40, 30) — cap at that score + 8.
+- Use the per-dimension calibration table. A curiosityGap of 16+ means specificity comparable to "72 Minutes to Wipe Out 60%." Generic AI topics max at 12.
+- Apply ALL hard dimension caps mechanically.
 
 Apply the tier classification strictly:
 - Tier 3 = NO guest mention in YouTube titles (topic-only)

@@ -327,9 +327,12 @@ This means:
 Compare each to the ground truth examples. Would this title get
 similar engagement? Be BRUTAL.
 
-### Step 6: Output only titles scoring 75+
-(Yes, 75 — because a genuinely honest 75 is better than
-a self-inflated 85 on a mediocre title)
+### Step 6: Score honestly — inflation will be caught
+An independent evaluator will re-score every title you produce.
+If your self-score is more than 8 points above the evaluator's score,
+your calibration is broken. Score against the per-dimension calibration
+table — a CG of 16 means specificity comparable to "72 minutes."
+Do NOT inflate scores to meet a threshold.
 
 NOTE: Do NOT include reasoning or thinking outside the JSON structure.
 All work must be captured in the rejectedTitles and reasoningNotes fields.
@@ -375,7 +378,7 @@ Focus ALL of your reasoning and creativity on the titles.
 ## CRITICAL RULES
 - Return ONLY the JSON object. No other text.
 - The "total" score MUST equal the sum of all individual dimension scores.
-- Every title MUST score 75+. If you can't make it score 75+, rewrite until it does.
+- Score every title honestly against the calibration benchmarks and per-dimension table. An independent evaluator will verify. Inflated self-scores will be caught and the title will be sent back for rewriting anyway.
 - YouTube titles and Spotify titles should use DIFFERENT angles for variety.
 - Include at least 3 rejected titles in rejectedTitles to show your work.
 - Do NOT include youtubeDescription, spotifyDescription, or chapters fields.`;
@@ -408,7 +411,7 @@ Now generate optimized TITLES ONLY (descriptions and chapters are handled separa
 - Apply the Scroll Test and Group Chat Test to every title
 - Check every title against the AI Slop banned list
 - Score honestly against calibration benchmarks
-- All titles must score 75+ (honest 75 > inflated 85)
+- Score honestly against calibration benchmarks — an independent evaluator will verify all scores
 - YouTube titles: 50-70 chars, NO em dashes, sounds like a human said it
 - Spotify titles: 60-80 chars, magazine-headline energy
 - Include your rejected titles with reasons in the rejectedTitles field
