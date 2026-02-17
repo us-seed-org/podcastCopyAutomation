@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { scoreBreakdownSchema, tierClassificationSchema } from "./generation-output";
+import { scoreBreakdownSchema, thumbnailTextScoreSchema, tierClassificationSchema } from "./generation-output";
 
-export const scoredTitleSchema = z.object({
+const scoredBaseTitleSchema = z.object({
   title: z.string().min(1),
   score: scoreBreakdownSchema,
   scrollStopReason: z.string().min(1),
@@ -9,9 +9,16 @@ export const scoredTitleSchema = z.object({
   platformNotes: z.string().min(1),
 });
 
+export const scoredYouTubeTitleSchema = scoredBaseTitleSchema.extend({
+  thumbnailText: z.string().min(1),
+  thumbnailTextScore: thumbnailTextScoreSchema,
+});
+
+export const scoredSpotifyTitleSchema = scoredBaseTitleSchema;
+
 export const scoringOutputSchema = z.object({
-  youtubeTitles: z.array(scoredTitleSchema),
-  spotifyTitles: z.array(scoredTitleSchema),
+  youtubeTitles: z.array(scoredYouTubeTitleSchema),
+  spotifyTitles: z.array(scoredSpotifyTitleSchema),
   tierClassification: tierClassificationSchema,
 });
 

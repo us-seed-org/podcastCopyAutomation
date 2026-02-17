@@ -8,27 +8,15 @@ import {
   buildScoringSystemPrompt,
   buildScoringUserPrompt,
 } from "@/lib/prompts/scoring-system";
-import {
-  buildDescriptionAnalysisSystemPrompt,
-  buildDescriptionAnalysisUserPrompt,
-} from "@/lib/prompts/description-analysis-system";
-import {
-  buildDescriptionChapterSystemPrompt,
-  buildDescriptionChapterUserPrompt,
-} from "@/lib/prompts/description-chapter-system";
 import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
 import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
-import { descriptionChapterOutputSchema } from "@/lib/schemas/description-chapter-output";
-import { descriptionAnalysisOutputSchema } from "@/lib/schemas/description-analysis-output";
-import { checkAiSlop } from "@/lib/guardrails/ai-slop";
+import { checkAiSlop, checkThumbnailText } from "@/lib/guardrails/ai-slop";
 import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
-import { checkChapterFormat } from "@/lib/guardrails/chapter-format";
 
 export const maxDuration = 300;
 
 const REWRITE_THRESHOLD = 65;
 const MAX_REWRITE_ATTEMPTS = 3;
-const DESC_REWRITE_THRESHOLD = 70;
 
 function sendSSE(
   controller: ReadableStreamDefaultController,
@@ -114,58 +102,10 @@ export async function POST(request: Request) {
           const guestCredential =
             researchObj?.guest?.authorityLabel || undefined;
 
-          // === PASS 0: Analyze description patterns from prior videos ===
-          let descriptionPatternStr: string | null = null;
-
-          const ytData =
-            typeof youtubeAnalysis === "string" ? null : youtubeAnalysis;
-          const priorDescriptions: string[] = (ytData?.recentVideos || [])
-            .map((v: any) => v.description)
-            .filter((d: string) => d && d.length > 50);
-
-          if (priorDescriptions.length >= 3) {
-            sendSSE(controller, encoder, {
-              type: "status",
-              message: `Analyzing ${priorDescriptions.length} prior video descriptions for patterns...`,
-            });
-
-            try {
-              const descAnalysis = await generateObject({
-                model: generationModel,
-                schema: descriptionAnalysisOutputSchema,
-                system: buildDescriptionAnalysisSystemPrompt(),
-                prompt: buildDescriptionAnalysisUserPrompt(priorDescriptions),
-              });
-
-              descriptionPatternStr = JSON.stringify(
-                descAnalysis.object,
-                null,
-                2
-              );
-              sendSSE(controller, encoder, {
-                type: "status",
-                message: "Description patterns extracted successfully.",
-              });
-            } catch (err) {
-              console.warn("[PASS 0] Description analysis failed:", err);
-              sendSSE(controller, encoder, {
-                type: "status",
-                message:
-                  "Description analysis failed — using best practices.",
-              });
-            }
-          } else {
-            sendSSE(controller, encoder, {
-              type: "status",
-              message:
-                "No prior descriptions available — using best practices.",
-            });
-          }
-
-          // === PASS 1: Generate titles ===
+          // === PASS 1: Generate titles + thumbnail text ===
           sendSSE(controller, encoder, {
             type: "status",
-            message: "Generating title options...",
+            message: "Generating titles + thumbnail text...",
           });
 
           const systemPrompt = buildGenerationSystemPrompt();
@@ -205,7 +145,7 @@ export async function POST(request: Request) {
             generated = JSON.parse(jsonStr);
           }
 
-          // Run guardrails on initial titles
+          // Run guardrails on initial titles + thumbnail text
           const slopCheck = checkAiSlop(getAllTitleTexts(generated));
           const tierCheck = checkTierCompliance(
             guestName,
@@ -213,11 +153,18 @@ export async function POST(request: Request) {
             guestCredential,
             (generated.youtubeTitles || []).map((t: any) => t.title)
           );
+          const thumbCheck = checkThumbnailText(
+            (generated.youtubeTitles || []).map((t: any) => ({
+              thumbnailText: t.thumbnailText || "",
+              title: t.title,
+            }))
+          );
 
-          if (!slopCheck.passed || !tierCheck.passed) {
+          if (!slopCheck.passed || !tierCheck.passed || !thumbCheck.passed) {
             const allViolations = [
               ...slopCheck.violations,
               ...tierCheck.violations,
+              ...thumbCheck.violations,
             ];
             sendSSE(controller, encoder, {
               type: "status",
@@ -289,25 +236,36 @@ Re-generate ALL titles, ensuring NONE of these violations remain.`;
             }
           }
 
-          // Merge scores onto generated titles
+          // Merge scores onto generated titles (including thumbnail text scores for YouTube)
           if (scored) {
-            for (const section of [
-              "youtubeTitles",
-              "spotifyTitles",
-            ] as const) {
-              if (generated[section] && scored[section]) {
-                generated[section] = generated[section].map(
-                  (t: any, i: number) => ({
-                    ...t,
-                    score: scored[section]?.[i]?.score || t.score,
-                    scrollStopReason:
-                      scored[section]?.[i]?.scrollStopReason ||
-                      t.scrollStopReason,
-                    platformNotes:
-                      scored[section]?.[i]?.platformNotes || t.platformNotes,
-                  })
-                );
-              }
+            if (generated.youtubeTitles && scored.youtubeTitles) {
+              generated.youtubeTitles = generated.youtubeTitles.map(
+                (t: any, i: number) => ({
+                  ...t,
+                  score: scored.youtubeTitles?.[i]?.score || t.score,
+                  scrollStopReason:
+                    scored.youtubeTitles?.[i]?.scrollStopReason ||
+                    t.scrollStopReason,
+                  platformNotes:
+                    scored.youtubeTitles?.[i]?.platformNotes || t.platformNotes,
+                  thumbnailTextScore:
+                    scored.youtubeTitles?.[i]?.thumbnailTextScore ||
+                    t.thumbnailTextScore,
+                })
+              );
+            }
+            if (generated.spotifyTitles && scored.spotifyTitles) {
+              generated.spotifyTitles = generated.spotifyTitles.map(
+                (t: any, i: number) => ({
+                  ...t,
+                  score: scored.spotifyTitles?.[i]?.score || t.score,
+                  scrollStopReason:
+                    scored.spotifyTitles?.[i]?.scrollStopReason ||
+                    t.scrollStopReason,
+                  platformNotes:
+                    scored.spotifyTitles?.[i]?.platformNotes || t.platformNotes,
+                })
+              );
             }
             generated.tierClassification = scored.tierClassification;
           }
@@ -318,9 +276,13 @@ Re-generate ALL titles, ensuring NONE of these violations remain.`;
             attempt <= MAX_REWRITE_ATTEMPTS;
             attempt++
           ) {
+            // A YouTube title is weak if either title score OR thumbnail text score is below threshold
             const weakYTIndices = (generated.youtubeTitles || [])
               .map((t: any, i: number) =>
-                (t.score?.total || 0) < REWRITE_THRESHOLD ? i : -1
+                (t.score?.total || 0) < REWRITE_THRESHOLD ||
+                (t.thumbnailTextScore?.total || 0) < REWRITE_THRESHOLD
+                  ? i
+                  : -1
               )
               .filter((i: number) => i !== -1);
             const weakSPIndices = (generated.spotifyTitles || [])
@@ -338,7 +300,7 @@ Re-generate ALL titles, ensuring NONE of these violations remain.`;
             if (weakYT.length === 0 && weakSP.length === 0) {
               sendSSE(controller, encoder, {
                 type: "status",
-                message: `All titles passed threshold (${REWRITE_THRESHOLD}+).`,
+                message: `All titles + thumbnail text passed threshold (${REWRITE_THRESHOLD}+).`,
               });
               break;
             }
@@ -362,9 +324,12 @@ Re-generate ALL titles, ensuring NONE of these violations remain.`;
                   )
                   .map(([k]) => k)
                   .join(", ") || "overall quality";
+              const thumbFeedback = (t.thumbnailTextScore?.total || 0) < REWRITE_THRESHOLD
+                ? ` Thumbnail text "${t.thumbnailText}" scored ${t.thumbnailTextScore?.total}/100 — also needs rewriting.`
+                : "";
               feedback.push({
                 title: t.title,
-                message: `YouTube: "${t.title}" scored ${t.score?.total}/100. Problems: low ${lowDims}`,
+                message: `YouTube: "${t.title}" scored ${t.score?.total}/100. Problems: low ${lowDims}.${thumbFeedback}`,
                 platform: "YouTube",
               });
             }
@@ -486,6 +451,10 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                     rewriteScored?.youtubeTitles?.[ri]?.score ||
                     rewrittenItem.score ||
                     generated.youtubeTitles[originalIndex].score,
+                  thumbnailTextScore:
+                    rewriteScored?.youtubeTitles?.[ri]?.thumbnailTextScore ||
+                    rewrittenItem.thumbnailTextScore ||
+                    generated.youtubeTitles[originalIndex].thumbnailTextScore,
                   rewritten: true,
                 };
               }
@@ -516,201 +485,6 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               })),
               ...(rewritten.rejectedTitles || []),
             ];
-          }
-
-          // === PASS 4: Dedicated description + chapter generation ===
-          sendSSE(controller, encoder, {
-            type: "status",
-            message:
-              "Generating descriptions and chapters with dedicated agent...",
-          });
-
-          const winningTitles = {
-            youtube: (generated.youtubeTitles || []).map(
-              (t: any) => t.title
-            ),
-            spotify: (generated.spotifyTitles || []).map(
-              (t: any) => t.title
-            ),
-          };
-
-          let descChapterResult: any = null;
-          try {
-            const descResult = await generateObject({
-              model: generationModel,
-              schema: descriptionChapterOutputSchema,
-              system: buildDescriptionChapterSystemPrompt(),
-              prompt: buildDescriptionChapterUserPrompt({
-                winningTitles,
-                research: researchStr,
-                transcript,
-                episodeDescription,
-                descriptionPattern: descriptionPatternStr,
-              }),
-            });
-            descChapterResult = descResult.object;
-          } catch (err) {
-            console.warn("[PASS 4] generateObject for descriptions failed, falling back:", err);
-            try {
-              const fallback = await generateText({
-                model: generationModel,
-                system: buildDescriptionChapterSystemPrompt(),
-                prompt: buildDescriptionChapterUserPrompt({
-                  winningTitles,
-                  research: researchStr,
-                  transcript,
-                  episodeDescription,
-                  descriptionPattern: descriptionPatternStr,
-                }),
-              });
-              const descJsonStr = extractFirstJson(fallback.text);
-              if (descJsonStr) {
-                descChapterResult = JSON.parse(descJsonStr);
-              }
-            } catch {
-              console.warn("[PASS 4] Description fallback also failed");
-            }
-          }
-
-          if (descChapterResult) {
-            // Run chapter format guardrail
-            const chapterCheck = checkChapterFormat(
-              descChapterResult.chapters || []
-            );
-            if (!chapterCheck.passed) {
-              sendSSE(controller, encoder, {
-                type: "status",
-                message: `Chapter format violations (${chapterCheck.violations.length}), re-generating...`,
-              });
-
-              try {
-                const fixResult = await generateObject({
-                  model: generationModel,
-                  schema: descriptionChapterOutputSchema,
-                  system: buildDescriptionChapterSystemPrompt(),
-                  prompt:
-                    buildDescriptionChapterUserPrompt({
-                      winningTitles,
-                      research: researchStr,
-                      transcript,
-                      episodeDescription,
-                      descriptionPattern: descriptionPatternStr,
-                    }) +
-                    "\n\n## CHAPTER FORMAT VIOLATIONS — FIX THESE\n\n" +
-                    chapterCheck.violations
-                      .map((v) => `- ${v}`)
-                      .join("\n") +
-                    "\n\nFix ALL violations above. Every chapter title must be 25-50 chars with no em dashes, arrows, or parentheticals.",
-                });
-                descChapterResult = fixResult.object;
-              } catch {
-                console.warn("[PASS 4] Chapter fix re-generation failed");
-              }
-            }
-
-            generated.youtubeDescription =
-              descChapterResult.youtubeDescription ||
-              generated.youtubeDescription;
-            generated.spotifyDescription =
-              descChapterResult.spotifyDescription ||
-              generated.spotifyDescription;
-            generated.chapters =
-              descChapterResult.chapters || generated.chapters;
-            generated.descriptionScore =
-              descChapterResult.descriptionScore || null;
-            generated.chapterScore =
-              descChapterResult.chapterScore || null;
-
-            // === PASS 5: Rewrite weak descriptions/chapters if scores are low ===
-            const descScore =
-              descChapterResult.descriptionScore?.total || 0;
-            const chapScore =
-              descChapterResult.chapterScore?.total || 0;
-
-            if (
-              descScore < DESC_REWRITE_THRESHOLD ||
-              chapScore < DESC_REWRITE_THRESHOLD
-            ) {
-              sendSSE(controller, encoder, {
-                type: "status",
-                message: `Rewriting ${descScore < DESC_REWRITE_THRESHOLD ? "description" : ""}${descScore < DESC_REWRITE_THRESHOLD && chapScore < DESC_REWRITE_THRESHOLD ? " and " : ""}${chapScore < DESC_REWRITE_THRESHOLD ? "chapters" : ""} (scored ${descScore}/100, ${chapScore}/100)...`,
-              });
-
-              const rewriteDescPrompt = `## REWRITE REQUEST
-
-The descriptions/chapters scored poorly and need rewriting.
-
-Description score: ${descScore}/100
-${descScore < DESC_REWRITE_THRESHOLD ? `Problems: ${JSON.stringify(descChapterResult.descriptionScore)}` : "Description OK."}
-
-Chapter score: ${chapScore}/100
-${chapScore < DESC_REWRITE_THRESHOLD ? `Problems: ${JSON.stringify(descChapterResult.chapterScore)}` : "Chapters OK."}
-
-Current YouTube description:
-${descChapterResult.youtubeDescription || "None"}
-
-Current chapters:
-${(descChapterResult.chapters || []).map((c: any) => `${c.timestamp} ${c.title}`).join("\n")}
-
-## WINNING TITLES
-YouTube: ${winningTitles.youtube.join(" | ")}
-Spotify: ${winningTitles.spotify.join(" | ")}
-
-## DESCRIPTION PATTERN FROM PRIOR VIDEOS
-${descriptionPatternStr || "No prior video analysis available."}
-
-## RESEARCH
-${researchStr}
-
-## TRANSCRIPT
-${transcript.slice(0, 8000)}
-
-## EPISODE DESCRIPTION
-${episodeDescription}
-
-REWRITE from scratch. Focus on:
-${descScore < DESC_REWRITE_THRESHOLD ? "- YouTube description: hook paragraph must sound like a Wired article, NOT 'In this episode...'" : ""}
-${chapScore < DESC_REWRITE_THRESHOLD ? "- Chapters: every title needs an active verb, specific detail, NO em dashes/arrows/parenthetical fillers" : ""}
-
-Return the same JSON structure with updated scores.`;
-
-              try {
-                const rewriteDescResult = await generateObject({
-                  model: generationModel,
-                  schema: descriptionChapterOutputSchema,
-                  system: buildDescriptionChapterSystemPrompt(),
-                  prompt: rewriteDescPrompt,
-                });
-                const rewrittenDesc = rewriteDescResult.object;
-
-                if (rewrittenDesc.youtubeDescription) {
-                  generated.youtubeDescription =
-                    rewrittenDesc.youtubeDescription;
-                }
-                if (rewrittenDesc.spotifyDescription) {
-                  generated.spotifyDescription =
-                    rewrittenDesc.spotifyDescription;
-                }
-                if (
-                  chapScore < DESC_REWRITE_THRESHOLD &&
-                  rewrittenDesc.chapters
-                ) {
-                  generated.chapters = rewrittenDesc.chapters;
-                }
-                if (rewrittenDesc.descriptionScore) {
-                  generated.descriptionScore =
-                    rewrittenDesc.descriptionScore;
-                }
-                if (
-                  chapScore < DESC_REWRITE_THRESHOLD &&
-                  rewrittenDesc.chapterScore
-                ) {
-                  generated.chapterScore = rewrittenDesc.chapterScore;
-                }
-              } catch {
-                console.warn("[PASS 5] Description rewrite failed");
-              }
-            }
           }
 
           sendSSE(controller, encoder, { type: "complete", data: generated });

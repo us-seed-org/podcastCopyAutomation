@@ -61,6 +61,7 @@ export async function POST(request: Request) {
               audienceProfile: targetAudience || "General audience interested in discussed topics",
             },
             transcript: {
+              hotTakes: [],
               topClaims: [],
               specificNumbers: [],
               emotionalMoments: [],
@@ -72,7 +73,20 @@ export async function POST(request: Request) {
             searchQueriesUsed: [],
           };
 
-          sendSSE(controller, encoder, { type: "complete", data: noGuestResearch });
+          let validatedNoGuest;
+          try {
+            validatedNoGuest = researchOutputSchema.parse(noGuestResearch);
+          } catch (validationError) {
+            console.error("noGuestResearch validation failed:", validationError);
+            sendSSE(controller, encoder, {
+              type: "error",
+              message: "Internal error: default research output failed schema validation",
+            });
+            controller.close();
+            return;
+          }
+
+          sendSSE(controller, encoder, { type: "complete", data: validatedNoGuest });
           controller.close();
         },
       });

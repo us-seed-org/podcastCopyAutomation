@@ -130,7 +130,7 @@ not subjective — if the title says "AI" but not a specific AI trend, TK cap is
 
 | Dimension | Points | The REAL test |
 |-----------|--------|---------------|
-| Curiosity Gap | /20 | Does it create a SPECIFIC question I need answered? Not "hmm interesting" but "WAIT WHAT?" If the question is vague, max 8. |
+| Curiosity Gap | /20 | Does it create a SPECIFIC question I need answered? Not "hmm interesting" but "WAIT WHAT?" Titles built around hot takes (contrarian claims, debunking, shocking stats) naturally create stronger curiosity gaps than vague generic topic titles. Vague titles (e.g., "Why Everyone Is Talking About AI") score max 12. Well-crafted universal-topic titles that promise a specific mechanism or insight (e.g., "What Alcohol Does to Your Body at Every Age") score highly even without contrarian framing. |
 | Authority Signal | /15 | Would your MOM be impressed by this credential? If it requires explaining, max 5. If it's Tier 3, score the topic's inherent authority instead. |
 | Emotional Trigger | /15 | Does it trigger a GUT reaction? Fear of missing out, fear of harm, outrage, shock? If the reaction is just "oh, neat" — max 6. |
 | Trending Keyword | /10 | Is there a word/phrase people are ACTIVELY searching for right now? Not just "AI" (too broad) but "AI layoffs" or "Ozempic" or "vibe coding" (specific trending terms). |
@@ -139,6 +139,41 @@ not subjective — if the title says "AI" but not a specific AI trend, TK cap is
 | Word Balance | /10 | Does it sound like a HUMAN said it? Read it out loud. If it sounds like a robot wrote it, max 4. |
 | Front-Load | /5 | First 5 words must create the hook. If the interesting part is at the end, max 2. |
 | Thumbnail Complement | /5 | Does it add info that a face+emotion thumbnail doesn't already convey? |
+
+## THUMBNAIL TEXT SCORING RUBRIC
+
+Thumbnail text is the 2-5 bold words displayed ON the video thumbnail.
+It must complement the title, never repeat it. Score each thumbnail text
+on these 4 dimensions (total /100):
+
+### Thumbnail Text Dimensions
+
+| Dimension | Points | The REAL test |
+|-----------|--------|---------------|
+| Curiosity Gap | /25 | Does it open a SPECIFIC loop only clicking closes? "STOP" alone = max 15. "STOP EATING THIS" = 20+. Must create genuine "wait, what?" |
+| Emotional Punch | /25 | Gut reaction in 1-5 words? Does it match an expressive face? Anger/fear/shock = 20+. "Interesting" = max 10. |
+| Title Complement | /25 | Does it add NEW information the title doesn't contain? If ANY word or phrase from the title appears in the thumbnail text, max 5. Perfect complement = 25. |
+| Brevity & Clarity | /25 | 2 words = 25. 3 words = 23. 4 words = 18. 5 words = 13. 6+ words = 0. Would you read it at phone-thumbnail size? |
+
+### Thumbnail Text Calibration
+
+| Score | Thumbnail Text | Paired Title | Why |
+|-------|---------------|--------------|-----|
+| 95 | STOP SLEEPING | The Sleep Doctor's Warning That Changed Everything | 2 words, loss aversion, instant gut punch, adds urgency title lacks |
+| 90 | 72 MINUTES | Nuclear War Expert: How Fast Civilization Ends | Specific number, visceral, complements "how fast" with the chilling answer |
+| 85 | HE'S WRONG | Dr. Huberman on Why Most Health Advice Fails | Contrarian energy, 2 words, confrontational — face + text = drama |
+| 75 | THE TRUTH | What Nobody Tells You About AI Jobs | Works but generic — "truth" is overused, no specificity |
+| 60 | AI WARNING | Why AI Could Replace 80% of Jobs | Vague, doesn't add much, no emotional trigger |
+| 40 | SLEEP HEALTH | Why Sleep Deprivation Destroys Your Health | Repeats title keywords — zero complementary value |
+
+### Thumbnail Text Hard Caps
+
+| Condition | Max Score |
+|-----------|-----------|
+| 6+ words | brevityAndClarity = 0 |
+| Any word from the title appears in thumbnail text | titleComplement max 5 |
+| Emotional reaction is merely "interesting" not visceral | emotionalPunch max 10 |
+| Generic single word ("WARNING", "TRUTH", "NEWS") with no specificity | curiosityGap max 12 |
 
 ### THE HONESTY CHECK (MANDATORY — 3 STEPS)
 

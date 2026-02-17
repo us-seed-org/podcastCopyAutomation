@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScoreBadge } from "@/components/score-badge";
 import { ScoreBreakdownChart } from "@/components/score-breakdown";
+import { ThumbnailTextScoreChart } from "@/components/thumbnail-text-score";
 import { CopyButton } from "@/components/copy-button";
-import { ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon } from "lucide-react";
 import type { TitleOption } from "@/types/generation";
 
 interface TitleCardProps {
@@ -49,6 +50,27 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
           <ScoreBadge score={title.score.total} />
         </div>
 
+        {/* Thumbnail Text — YouTube only */}
+        {platform === "youtube" && title.thumbnailText && (
+          <div className="mb-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Thumbnail Text
+              </span>
+              {title.thumbnailTextScore && (
+                <ScoreBadge score={title.thumbnailTextScore.total} showLabel={false} />
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="bg-red-600 text-white font-black text-xl tracking-wide px-4 py-2.5 rounded-lg shadow-md uppercase leading-tight">
+                {title.thumbnailText}
+              </div>
+              <CopyButton text={title.thumbnailText} label="Copy" />
+            </div>
+          </div>
+        )}
+
         <p className="text-lg font-semibold leading-snug mb-4 text-foreground/95">
           {title.title}
         </p>
@@ -84,8 +106,17 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
               {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </CollapsibleTrigger>
           </div>
-          <CollapsibleContent className="mt-4">
-            <ScoreBreakdownChart score={title.score} />
+          <CollapsibleContent className="mt-4 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Title Score</p>
+              <ScoreBreakdownChart score={title.score} />
+            </div>
+            {platform === "youtube" && title.thumbnailTextScore && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Thumbnail Text Score</p>
+                <ThumbnailTextScoreChart score={title.thumbnailTextScore} />
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

@@ -6,9 +6,11 @@ export function buildScoringSystemPrompt(): string {
 ## YOUR TASK
 
 You will receive:
-1. Generated titles from the generation phase
+1. Generated titles (with thumbnail text for YouTube titles) from the generation phase
 2. The research intelligence including guestTier classification
 3. Calibration benchmarks (real high-performing titles with known scores)
+
+You must score BOTH the titles AND the thumbnail text independently.
 
 ## SCORING PRINCIPLES
 
@@ -18,6 +20,13 @@ You will receive:
 4. **Be calibrated** — average AI-generated titles score 55-65. Good titles that follow the rules well score 65-78. Only truly exceptional titles (calibration-benchmark level) deserve 80+.
 5. **Most AI-generated titles are mediocre** — your default assumption should be that a title scores 55-65 until proven otherwise. The burden of proof is on the title to earn a high score, not on you to justify a low one.
 6. **Use the per-dimension calibration table** — do NOT guess what a dimension score "means." Look up the benchmark closest in quality for that dimension and use its score as your anchor.
+
+## THUMBNAIL TEXT SCORING PRINCIPLES
+
+1. **Thumbnail text must complement the title, NEVER repeat it.** If any significant word from the title appears in the thumbnail text, titleComplement maxes at 5.
+2. **2-5 words only.** 6+ words = brevityAndClarity score of 0.
+3. **Must trigger a gut reaction.** If the emotional response is merely "interesting," emotionalPunch maxes at 10.
+4. **Score against the thumbnail text calibration benchmarks** in the rubric below.
 
 ## MANDATORY SCORING PROCESS (follow for EACH title)
 
@@ -68,7 +77,15 @@ Return a JSON object with this exact structure:
       },
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",
       "emotionalTrigger": "Primary emotion targeted",
-      "platformNotes": "Why this works for YouTube specifically"
+      "platformNotes": "Why this works for YouTube specifically",
+      "thumbnailText": "THE THUMBNAIL TEXT IN ALL CAPS",
+      "thumbnailTextScore": {
+        "curiosityGap": 0-25,
+        "emotionalPunch": 0-25,
+        "titleComplement": 0-25,
+        "brevityAndClarity": 0-25,
+        "total": 0-100
+      }
     }
   ],
   "spotifyTitles": [
@@ -98,11 +115,16 @@ Return a JSON object with this exact structure:
   }
 }
 
+NOTE: YouTube titles include thumbnailText and thumbnailTextScore. Spotify titles do NOT.
+
 ## CRITICAL RULES
 
-- The "total" score MUST equal the sum of all individual dimension scores.
+- The "total" score MUST equal the sum of all individual dimension scores (for both title scores AND thumbnail text scores).
 - If tier=3 and a YouTube title includes the guest name or credential, score that title max 30.
 - If tier=2 and a YouTube title uses the guest's actual name instead of the credential, score that title max 40.
+- YouTube titles MUST include thumbnailText and thumbnailTextScore. Spotify titles must NOT.
+- If thumbnail text repeats significant words from the title, thumbnailTextScore.titleComplement max 5.
+- If thumbnail text is 6+ words, thumbnailTextScore.brevityAndClarity = 0.
 - Return ONLY the JSON object. No other text.`;
 }
 
@@ -125,7 +147,7 @@ ${input.generatedTitles.trim()}
 
 ${input.research.trim()}
 
-Now evaluate these titles. Follow the MANDATORY SCORING PROCESS for each title.
+Now evaluate these titles AND their thumbnail text. Follow the MANDATORY SCORING PROCESS for each title.
 
 CRITICAL REMINDERS:
 - Default assumption: AI-generated titles score 55-65. The title must EARN higher.
@@ -139,5 +161,12 @@ Apply the tier classification strictly:
 - Tier 2 = Use credential ONLY, not name
 - Tier 1 = Lead with name
 
-Return ONLY the JSON object with scores and tier verification.`;
+THUMBNAIL TEXT scoring:
+- Score each YouTube title's thumbnailText against the thumbnail text calibration benchmarks
+- Check: does it repeat words from the title? If so, titleComplement max 5
+- Check: is it 2-5 words? 6+ words = brevityAndClarity 0
+- Check: does it trigger an immediate visceral gut reaction (shock, fear, outrage, excitement)? Could you picture a face showing that emotion next to these words? If the reaction is merely "interesting," emotionalPunch maxes at 10.
+- YouTube titles include thumbnailText + thumbnailTextScore. Spotify titles do NOT.
+
+Return ONLY the JSON object with scores, thumbnail text scores, and tier verification.`;
 }

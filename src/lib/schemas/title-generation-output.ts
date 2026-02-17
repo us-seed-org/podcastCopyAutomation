@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { scoreBreakdownSchema, rejectedTitleSchema } from "./generation-output";
+import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema } from "./generation-output";
 
-export const generatedTitleSchema = z.object({
+const generatedBaseTitleSchema = z.object({
   title: z.string(),
   score: scoreBreakdownSchema,
   scrollStopReason: z.string(),
@@ -9,9 +9,16 @@ export const generatedTitleSchema = z.object({
   platformNotes: z.string(),
 });
 
+export const generatedYouTubeTitleSchema = generatedBaseTitleSchema.extend({
+  thumbnailText: z.string(),
+  thumbnailTextScore: thumbnailTextScoreSchema,
+});
+
+export const generatedSpotifyTitleSchema = generatedBaseTitleSchema;
+
 export const titleGenerationOutputSchema = z.object({
-  youtubeTitles: z.array(generatedTitleSchema).length(2),
-  spotifyTitles: z.array(generatedTitleSchema).length(2),
+  youtubeTitles: z.array(generatedYouTubeTitleSchema).length(2),
+  spotifyTitles: z.array(generatedSpotifyTitleSchema).length(2),
   rejectedTitles: z.array(rejectedTitleSchema).min(1),
 });
 

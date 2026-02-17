@@ -13,22 +13,30 @@ export const scoreBreakdownSchema = z.object({
   total: z.number().min(0).max(100),
 });
 
+export const thumbnailTextScoreSchema = z.object({
+  curiosityGap: z.number().min(0).max(25),
+  emotionalPunch: z.number().min(0).max(25),
+  titleComplement: z.number().min(0).max(25),
+  brevityAndClarity: z.number().min(0).max(25),
+  total: z.number().min(0).max(100),
+});
+
 export const titleOptionSchema = z.object({
   title: z.string(),
   score: scoreBreakdownSchema,
   scrollStopReason: z.string(),
   emotionalTrigger: z.string(),
   platformNotes: z.string(),
-});
+  thumbnailText: z.string().optional(),
+  thumbnailTextScore: thumbnailTextScoreSchema.optional(),
+}).refine(
+  (data) => (data.thumbnailText == null) === (data.thumbnailTextScore == null),
+  { message: "thumbnailText and thumbnailTextScore must both be present or both be absent" },
+);
 
 export const rejectedTitleSchema = z.object({
   title: z.string(),
   rejectionReason: z.string(),
-});
-
-export const chapterTitleSchema = z.object({
-  timestamp: z.string(),
-  title: z.string(),
 });
 
 export const tierClassificationSchema = z.object({
@@ -37,32 +45,11 @@ export const tierClassificationSchema = z.object({
   verification: z.string(),
 });
 
-export const descriptionScoreSchema = z.object({
-  hookQuality: z.number().min(0).max(25),
-  structuralMatch: z.number().min(0).max(25),
-  seoIntegration: z.number().min(0).max(25),
-  humanVoice: z.number().min(0).max(25),
-  total: z.number().min(0).max(100),
-});
-
-export const chapterScoreSchema = z.object({
-  specificityAvg: z.number().min(0).max(25),
-  activeVoice: z.number().min(0).max(25),
-  noBannedPatterns: z.number().min(0).max(25),
-  miniHookQuality: z.number().min(0).max(25),
-  total: z.number().min(0).max(100),
-});
-
 export const generationOutputSchema = z.object({
   youtubeTitles: z.array(titleOptionSchema).length(2),
   spotifyTitles: z.array(titleOptionSchema).length(2),
   rejectedTitles: z.array(rejectedTitleSchema).min(1),
-  youtubeDescription: z.string().optional(),
-  spotifyDescription: z.string().optional(),
-  chapters: z.array(chapterTitleSchema).optional(),
   tierClassification: tierClassificationSchema.optional(),
-  descriptionScore: descriptionScoreSchema.optional(),
-  chapterScore: chapterScoreSchema.optional(),
 });
 
 export type GenerationOutputSchema = z.infer<typeof generationOutputSchema>;

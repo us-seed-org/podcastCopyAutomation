@@ -83,7 +83,7 @@ Your titles will be rejected if they contain ANY of these patterns:
 **BANNED STRUCTURAL PATTERNS:**
 - [Noun Phrase] — [Second Noun Phrase] (the double em-dash structure)
 - [Stat] — [Fear statement] (stat + doom combo is overused)
-- Three buzzwords separated by commas then a colon
+- Three topic keywords separated by commas then a colon
   (BAD: "AI, Crypto & Biotech: The Future Is Here")
 - [Question]? [Second Question]? (double question = indecisive, not punchy)
 - [Statement]. [Filler tag like "Why It Matters"] (cut the filler, the statement IS the title)
@@ -152,8 +152,8 @@ The guest is NOT a household name, but they have a credential/authority label th
 
 ### Tier 3 — No Name Recognition AND No Strong Label → TOPIC-DRIVEN (DEFAULT for most episodes)
 The guest has zero name recognition AND their authority label references an organization or role that general audiences won't recognize or care about. This is the MOST COMMON scenario.
-- Rule: DROP the guest entirely from the YouTube title. Make the title PURELY about the TOPICS discussed, using interesting buzzwords and trending keywords.
-- The title should highlight the most interesting, clickable topics from the conversation
+- Rule: DROP the guest entirely from the YouTube title. Build the title around the strongest HOT TAKES from the transcript — contrarian claims, shocking stats, bold predictions, or provocative opinions.
+- The title should be anchored in the single most clickable hot take from the conversation, not a keyword salad
 - Think of it like a news headline — nobody cares WHO said it, they care about WHAT was said
 
 ### How to decide the tier:
@@ -198,6 +198,107 @@ AVOID these Tier 3 traps:
 - Asking a question instead of making a bold claim
 - Adding "Why It Matters" or "What You Need to Know" after a statement
 - Trying to cram multiple topics into one title
+
+### Provocative Quote / Hot Take Energy (ANY Tier — highest click potential)
+
+These work because they weaponize something the guest ACTUALLY SAID. The hot take
+IS the title. This archetype has the highest click-through potential because it
+triggers an immediate emotional reaction (agreement, outrage, or curiosity).
+
+Priority order for building a title:
+1. HOT TAKE from transcript (contrarian claim, debunking, bold prediction, shocking stat)
+2. Curiosity gap built around that hot take
+3. SEO keywords woven in naturally (secondary)
+
+- "Your Doctor Is Wrong About Cholesterol" (debunking conventional wisdom)
+- "College Is the Biggest Scam in America" (provocative opinion — would start an argument)
+- "80% of CEOs Will Be Replaced by AI by 2030" (shocking stat + bold prediction)
+- "Cardio Is Making You Fatter" (contrarian — goes against what everyone believes)
+- "This Doctor Called Ozempic the Worst Drug Since Opioids" (direct quote energy, Tier 2 only — credential provides antecedent)
+
+Notice the PATTERN in great hot take titles:
+- They are CLAIMS, not topics. "AI in Healthcare" is a topic. "AI Doctors Are Already Outperforming Humans" is a hot take.
+- They provoke a reaction: "wait, really?" or "that's insane" or "I need to hear why"
+- Negative sentiment (+22% more views) is natural when the hot take challenges beliefs
+- ONE hot take per title. Do not dilute with multiple claims.
+
+How to turn a hot take into a title:
+1. Find the guest's most extreme/surprising/contrarian statement from the hotTakes research data
+2. Distill it to its core claim in under 60 characters
+3. Frame it as a STATEMENT, not a question (statements beat questions 80% of the time)
+4. If the hot take has a specific number, KEEP the number — specificity drives clicks
+5. If the hot take debunks something, make the debunking the title (not the explanation)
+
+## THUMBNAIL TEXT — THE HIGHEST-LEVERAGE ELEMENT
+
+Thumbnail text is 2-5 bold words displayed directly ON the video thumbnail image.
+It is NOT the video title. It is the emotional hook that COMPLEMENTS the title.
+Together, title + thumbnail text form a two-part curiosity gap that only clicking
+can close.
+
+### THE GOLDEN RULE
+Thumbnail text must NEVER repeat the title. Ever.
+- Title = informational anchor (context, keywords, logical framing)
+- Thumbnail text = emotional hook (curiosity, urgency, tension)
+
+If the title is "Dr. Matthew Walker on Why Sleep Deprivation Is Destroying Your Health,"
+the thumbnail text is NOT "Sleep Deprivation." It's "STOP SLEEPING LIKE THIS" or
+"THE SLEEP WARNING" — creating a complementary emotional pull that adds NEW information.
+
+### THUMBNAIL TEXT RULES (HARD CONSTRAINTS)
+1. **2-5 words ONLY.** Under 20 characters ideal. Must register in a sub-second glance.
+2. **ALL CAPS.** Standard practice — uppercase letterforms are more uniform and parse faster at tiny sizes.
+3. **Must pair with a facial expression.** Imagine the guest's face showing shock, fear, excitement, or concern right next to these words. The text should feel like a caption for that emotion.
+4. **One idea.** Not a summary. Not a topic. One sharp emotional hook.
+5. **No banned punctuation.** No em dashes, semicolons, or ellipsis. Question marks OK (they visualize the open loop). Exclamation marks OK (max one).
+
+### FIVE WINNING THUMBNAIL TEXT PATTERNS
+
+**1. Authority + Revelation**
+"BILLIONAIRE'S #1 RULE" / "NAVY SEAL'S SECRET" / "THE DOCTOR WARNS"
+→ Leverages social proof + opens a curiosity loop
+
+**2. Loss Aversion**
+"STOP EATING THIS" / "AVOID THIS MISTAKE" / "DON'T DO THIS"
+→ People are 2x more motivated by avoiding losses than gaining equivalents
+
+**3. Specific Numbers**
+"$0 TO $1M" / "3 MISTAKES" / "72 MINUTES"
+→ Numbers provide cognitive anchoring and signal structured content
+
+**4. Incomplete Statements**
+"THE ONE THING" / "NOBODY TELLS YOU" / "WHAT THEY HIDE"
+→ Pure curiosity-gap plays that demand resolution
+
+**5. Contrarian Claims**
+"EVERYTHING WRONG" / "IT'S A LIE" / "THEY LIED"
+→ Cognitive dissonance is deeply uncomfortable — viewers click to resolve it
+
+### TIER-SPECIFIC THUMBNAIL TEXT
+
+- **Tier 1:** Can reference guest on thumbnail — "ELON WAS RIGHT" / "TRUMP WARNS"
+- **Tier 2:** Use credential shorthand — "THE DOCTOR WARNS" / "PROFESSOR'S SECRET"
+- **Tier 3:** Pure emotional/topic hook — "STOP DOING THIS" / "IT'S WORSE" / "THE REAL TRUTH"
+
+### THUMBNAIL TEXT SCORING (4 dimensions, /100 total)
+
+| Dimension | Points | The test |
+|-----------|--------|----------|
+| Curiosity Gap | /25 | Does it open a specific loop that ONLY clicking can close? "STOP" is weaker than "STOP EATING THIS" |
+| Emotional Punch | /25 | Gut reaction in 1-5 words? Anger/fear/shock > "interesting." Does it match a facial expression? |
+| Title Complement | /25 | Does it add NEW info that the title doesn't contain? Would title + thumbnail text together be stronger than either alone? If it repeats any phrase from the title, score 0. |
+| Brevity & Clarity | /25 | 2-3 words = 25. 4 words = 20. 5 words = 15. 6+ words = 0. Readable at 168x94 pixels? |
+
+### THUMBNAIL TEXT CALIBRATION BENCHMARKS
+
+| Score | Thumbnail Text | Paired Title | Why |
+|-------|---------------|--------------|-----|
+| 95 | "STOP SLEEPING" | "The Sleep Doctor's Warning That Changed Everything" | Loss aversion, 2 words, instant gut reaction, adds urgency title lacks |
+| 90 | "72 MINUTES" | "Nuclear War Expert: How Fast Civilization Ends" | Specific number, visceral, complements title's "how fast" with the answer |
+| 85 | "HE'S WRONG" | "Dr. Huberman on Why Most Health Advice Fails" | Contrarian, emotional, 2 words, adds confrontational energy |
+| 75 | "THE TRUTH" | "What Nobody Tells You About AI Jobs" | Adequate but generic — "truth" is overused, no specificity |
+| 60 | "AI WARNING" | "Why AI Could Replace 80% of Jobs" | Vague, doesn't add much beyond title, no emotional hook |
+| 40 | "SLEEP HEALTH" | "Why Sleep Deprivation Destroys Your Health" | Just repeats title keywords — zero complementary value |
 
 ## PLATFORM-SPECIFIC RULES
 
@@ -294,16 +395,23 @@ GOOD: "This AI Sent Us an Email. We Didn't Know It Wasn't Human."
 
 You MUST follow this exact process. Record your work in the JSON output fields.
 
-### Step 1: Extract the 3 "holy shit" moments from the transcript
-These are moments where, if you told a friend about this podcast, you'd say
-"dude, you won't believe what they said about ___." If there are no "holy
-shit" moments, find the most USEFUL or SURPRISING claims.
+### Step 1: Identify the top 3 hot takes from the research data
+The research intelligence includes a "hotTakes" array — these are the guest's
+most contrarian, shocking, provocative, or prediction-making moments. Read all
+of them and rank by clickability. Ask for each one: "If I texted this to a
+friend, would they immediately want to hear the episode?" Pick the top 3.
 
-### Step 2: Write 10 raw title attempts (store in rejectedTitles field)
-Just brain-dump. No formatting. Write them like you're texting a friend:
-- "bro this guy said AI agents are literally emailing people now"
-- "apparently 108K jobs got cut in january alone"
-- "he thinks we'll have an AI ceo of a fortune 500 company by 2030"
+If the research has no hotTakes, fall back to the topClaims and look for the
+most SURPRISING or CONTRARIAN claims. A hot take is always better than a
+trending keyword for driving clicks.
+
+### Step 2: Write 10 raw title attempts ANCHORED IN HOT TAKES (store in rejectedTitles field)
+For each of your top 3 hot takes, write 3 title angles. Then write 1 wildcard.
+Write them like you're texting a friend about what the guest said:
+- "bro this doctor said cardio is actually making people fatter"
+- "apparently 80% of CEOs could be replaced by AI by 2030"
+- "he literally called college the biggest scam in America"
+- "this guy thinks everything your doctor told you about cholesterol is wrong"
 
 ### Step 3: Kill the weak ones
 Cross out any that:
@@ -358,13 +466,27 @@ Return a JSON object with this exact structure:
       },
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",
       "emotionalTrigger": "Primary emotion targeted",
-      "platformNotes": "Why this works for YouTube specifically"
+      "platformNotes": "Why this works for YouTube specifically",
+      "thumbnailText": "2-5 WORDS IN ALL CAPS — the bold text shown on the thumbnail image",
+      "thumbnailTextScore": {
+        "curiosityGap": 0-25,
+        "emotionalPunch": 0-25,
+        "titleComplement": 0-25,
+        "brevityAndClarity": 0-25,
+        "total": 0-100
+      }
     },
-    { ... second YouTube title ... }
+    { ... second YouTube title with its own thumbnailText ... }
   ],
   "spotifyTitles": [
-    { ... same structure as YouTube titles but optimized for Spotify ... },
-    { ... second Spotify title ... }
+    {
+      "title": "string (60-80 chars)",
+      "score": { ... same 9-dimension score ... },
+      "scrollStopReason": "...",
+      "emotionalTrigger": "...",
+      "platformNotes": "..."
+    },
+    { ... second Spotify title — NO thumbnailText needed ... }
   ],
   "rejectedTitles": [
     {"title": "The title that was killed", "rejectionReason": "Why it was cut -- be specific"},
@@ -372,14 +494,16 @@ Return a JSON object with this exact structure:
   ]
 }
 
-NOTE: Do NOT generate descriptions or chapters. Those are handled by a separate dedicated agent.
-Focus ALL of your reasoning and creativity on the titles.
+NOTE: Spotify titles do NOT get thumbnailText (Spotify has no visual thumbnail text).
+NOTE: Do NOT generate descriptions or chapters. Focus ALL creativity on titles + thumbnail text.
 
 ## CRITICAL RULES
 - Return ONLY the JSON object. No other text.
-- The "total" score MUST equal the sum of all individual dimension scores.
+- The "total" score MUST equal the sum of all individual dimension scores (for both title scores AND thumbnail text scores).
 - Score every title honestly against the calibration benchmarks and per-dimension table. An independent evaluator will verify. Inflated self-scores will be caught and the title will be sent back for rewriting anyway.
 - YouTube titles and Spotify titles should use DIFFERENT angles for variety.
+- Each YouTube title MUST include a thumbnailText and thumbnailTextScore. Spotify titles do NOT get thumbnailText.
+- The thumbnailText must NEVER repeat words or phrases from its paired title. They are two halves of one hook.
 - Include at least 3 rejected titles in rejectedTitles to show your work.
 - Do NOT include youtubeDescription, spotifyDescription, or chapters fields.`;
 }
@@ -406,14 +530,14 @@ ${input.episodeDescription}
 
 ${input.transcript}
 
-Now generate optimized TITLES ONLY (descriptions and chapters are handled separately). Remember:
+Now generate optimized TITLES + THUMBNAIL TEXT. Remember:
 - Follow the MANDATORY GENERATION PROCESS (brainstorm 10 → kill weak ones → polish survivors)
 - Apply the Scroll Test and Group Chat Test to every title
 - Check every title against the AI Slop banned list
-- Score honestly against calibration benchmarks
 - Score honestly against calibration benchmarks — an independent evaluator will verify all scores
 - YouTube titles: 50-70 chars, NO em dashes, sounds like a human said it
-- Spotify titles: 60-80 chars, magazine-headline energy
+- Each YouTube title MUST include thumbnailText (2-5 words, ALL CAPS) that COMPLEMENTS the title — never repeats it
+- Spotify titles: 60-80 chars, magazine-headline energy, NO thumbnailText needed
 - Include your rejected titles with reasons in the rejectedTitles field
 - Do NOT include youtubeDescription, spotifyDescription, or chapters
 - Return ONLY the JSON object. No other text.`;

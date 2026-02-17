@@ -1,9 +1,28 @@
+// Disabled — description/chapter generation is currently on ice.
+// Kept for future re-enablement.
+
 import { z } from "zod";
-import {
-  chapterTitleSchema,
-  descriptionScoreSchema,
-  chapterScoreSchema,
-} from "./generation-output";
+
+const chapterTitleSchema = z.object({
+  timestamp: z.string(),
+  title: z.string(),
+});
+
+const descriptionScoreSchema = z.object({
+  hookQuality: z.number().min(0).max(25),
+  structuralMatch: z.number().min(0).max(25),
+  seoIntegration: z.number().min(0).max(25),
+  humanVoice: z.number().min(0).max(25),
+  total: z.number().min(0).max(100),
+});
+
+const chapterScoreSchema = z.object({
+  specificityAvg: z.number().min(0).max(25),
+  activeVoice: z.number().min(0).max(25),
+  noBannedPatterns: z.number().min(0).max(25),
+  miniHookQuality: z.number().min(0).max(25),
+  total: z.number().min(0).max(100),
+});
 
 export const descriptionChapterOutputSchema = z.object({
   youtubeDescription: z.string(),

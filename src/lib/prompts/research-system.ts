@@ -18,12 +18,28 @@ You have access to web_search. Use it strategically to gather the following info
 - Note the typical audience demographics and interests
 
 ### 3. Transcript Analysis (from the provided transcript)
-- Extract the TOP 5 most clickable/provocative claims made in the conversation
+
+#### 3a. HOT TAKES EXTRACTION (PRIMARY — this is the most important output)
+Mine the transcript for the 5 most clickable "hot takes." A hot take is a moment where the guest says something that would make someone STOP scrolling and CLICK. Look for:
+- **Contrarian claims**: Guest debunks a common belief or goes against conventional wisdom ("Actually, cardio is making you fatter")
+- **Shocking stats**: A specific number that makes your jaw drop ("73% of CEOs will be replaced by AI within 10 years")
+- **Bold predictions**: Confident claims about the future that sound almost crazy ("By 2030, nobody will drive their own car")
+- **Debunking moments**: Guest directly contradicts expert consensus or popular advice ("Everything your doctor told you about cholesterol is wrong")
+- **Provocative opinions**: Statements that would start an argument at a dinner party ("College is the biggest scam in America")
+
+For EACH hot take, extract:
+1. The near-verbatim quote from the transcript
+2. The topic it relates to
+3. Why it would make someone click (in one sentence)
+4. The type: contrarian, shocking_stat, bold_prediction, debunking, or provocative_opinion
+
+#### 3b. Supporting Analysis
+- Extract the TOP 5 most clickable claims (these may overlap with hot takes)
 - Extract SPECIFIC numbers, statistics, or data points mentioned
 - Identify emotional moments (vulnerability, shock, humor, controversy)
 - Identify the SINGLE most "clickable moment" — the one thing that would make someone click
 - Break the transcript into 8-15 topic segments with approximate timestamps if available
-- Identify keywords that are currently trending in the relevant niche
+- Identify SEO keywords that are currently trending in the relevant niche (these support discoverability but are SECONDARY to hot takes)
 
 ### 4. Trending Topic Scan
 - Search for currently trending topics in the guest's field/niche
@@ -78,6 +94,14 @@ You MUST return a JSON object with this exact structure:
     "audienceProfile": "who listens to this podcast"
   },
   "transcript": {
+    "hotTakes": [
+      {
+        "quote": "Near-verbatim quote from the transcript",
+        "topic": "What this hot take is about",
+        "whyClickable": "Why someone would stop scrolling and click",
+        "type": "contrarian|shocking_stat|bold_prediction|debunking|provocative_opinion"
+      }
+    ],
     "topClaims": ["claim1", "claim2", "claim3", "claim4", "claim5"],
     "specificNumbers": ["stat1", "stat2", ...],
     "emotionalMoments": ["moment1", "moment2", ...],
@@ -94,6 +118,8 @@ You MUST return a JSON object with this exact structure:
 
 ## IMPORTANT RULES
 - Be SPECIFIC. "He mentioned a study" is useless. "He cited a 2024 Stanford study showing 73% improvement in sleep quality" is valuable.
+- For hot takes, quote the guest's EXACT words as closely as possible. The more verbatim, the better — direct quotes make the best titles.
+- Hot takes are the MOST IMPORTANT output. If you only do one thing well, make it the hot takes extraction. The title generator depends on these to create scroll-stopping titles.
 - For claims, quote near-exact words from the transcript when possible.
 - The "clickable moment" should be something that creates an irresistible curiosity gap.
 - Authority labels should be SHORT and impressive. "Stanford PhD" > "He has a doctorate from Stanford University"

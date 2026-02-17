@@ -11,22 +11,27 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+export interface ThumbnailTextScore {
+  curiosityGap: number;
+  emotionalPunch: number;
+  titleComplement: number;
+  brevityAndClarity: number;
+  total: number;
+}
+
 export interface TitleOption {
   title: string;
   score: ScoreBreakdown;
   scrollStopReason: string;
   emotionalTrigger: string;
   platformNotes: string;
+  thumbnailText?: string;
+  thumbnailTextScore?: ThumbnailTextScore;
 }
 
 export interface RejectedTitle {
   title: string;
   rejectionReason: string;
-}
-
-export interface ChapterTitle {
-  timestamp: string;
-  title: string;
 }
 
 export type Tier = 1 | 2 | 3;
@@ -37,30 +42,9 @@ export interface TierClassification {
   verification: string;
 }
 
-export interface DescriptionScore {
-  hookQuality: number;
-  structuralMatch: number;
-  seoIntegration: number;
-  humanVoice: number;
-  total: number;
-}
-
-export interface ChapterScore {
-  specificityAvg: number;
-  activeVoice: number;
-  noBannedPatterns: number;
-  miniHookQuality: number;
-  total: number;
-}
-
 export interface GenerationOutput {
   youtubeTitles: TitleOption[];
   spotifyTitles: TitleOption[];
   rejectedTitles: RejectedTitle[];
-  youtubeDescription?: string;
-  spotifyDescription?: string;
-  chapters?: ChapterTitle[];
   tierClassification?: TierClassification;
-  descriptionScore?: DescriptionScore;
-  chapterScore?: ChapterScore;
 }

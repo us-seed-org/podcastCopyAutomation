@@ -66,3 +66,57 @@ export function checkAiSlop(texts: string[]): GuardrailResult {
 
   return { passed: violations.length === 0, violations };
 }
+
+export function checkThumbnailText(
+  thumbnailTexts: Array<{ thumbnailText: string; title: string }>
+): GuardrailResult {
+  const violations: string[] = [];
+
+  for (const { thumbnailText, title } of thumbnailTexts) {
+    const words = thumbnailText.trim().split(/\s+/);
+
+    if (words.length > 5) {
+      violations.push(
+        `Thumbnail text "${thumbnailText}" has ${words.length} words (max 5)`
+      );
+    }
+
+    if (words.length < 2 && thumbnailText.trim().length > 0) {
+      violations.push(
+        `Thumbnail text "${thumbnailText}" has only ${words.length} word (min 2)`
+      );
+    }
+
+    if (thumbnailText.length > 25) {
+      violations.push(
+        `Thumbnail text "${thumbnailText}" is ${thumbnailText.length} chars (max 25)`
+      );
+    }
+
+    // Check for title repetition — any word 4+ chars from title appearing in thumbnail text
+    const titleWords = title
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 4);
+    const thumbWords = thumbnailText
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 4);
+    const repeated = thumbWords.filter((tw) => titleWords.includes(tw));
+    if (repeated.length > 0) {
+      violations.push(
+        `Thumbnail text "${thumbnailText}" repeats word(s) from title: ${repeated.join(", ")}`
+      );
+    }
+
+    // Check banned punctuation
+    if (/\u2014/.test(thumbnailText)) {
+      violations.push(`Thumbnail text "${thumbnailText}" contains em dash`);
+    }
+    if (/;/.test(thumbnailText)) {
+      violations.push(`Thumbnail text "${thumbnailText}" contains semicolon`);
+    }
+  }
+
+  return { passed: violations.length === 0, violations };
+}

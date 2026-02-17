@@ -1,9 +1,22 @@
-import { z } from "zod";
+    import { z } from "zod";
 
 export const topicSegmentSchema = z.object({
   timestamp: z.string(),
   topic: z.string(),
   summary: z.string(),
+});
+
+export const hotTakeSchema = z.object({
+  quote: z.string().describe("Near-verbatim quote from transcript"),
+  topic: z.string().describe("What this hot take is about"),
+  whyClickable: z.string().describe("Why someone would stop scrolling and click"),
+  type: z.enum([
+    "contrarian",
+    "shocking_stat",
+    "bold_prediction",
+    "debunking",
+    "provocative_opinion",
+  ]),
 });
 
 export const guestTierSchema = z.object({
@@ -29,6 +42,7 @@ export const researchOutputSchema = z.object({
     audienceProfile: z.string(),
   }),
   transcript: z.object({
+    hotTakes: z.array(hotTakeSchema).length(5).describe("Top 5 most clickable hot takes from the transcript"),
     topClaims: z.array(z.string()),
     specificNumbers: z.array(z.string()),
     emotionalMoments: z.array(z.string()),

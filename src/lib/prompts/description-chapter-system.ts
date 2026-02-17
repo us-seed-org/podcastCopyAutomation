@@ -12,11 +12,12 @@ export function buildDescriptionChapterSystemPrompt(): string {
 
 ### The First 2-3 Lines Are EVERYTHING
 Only the first ~150 characters show before "Show More." This is your hook. It must:
-- Create a curiosity gap or make a bold claim from the episode
+- Lead with the strongest HOT TAKE from the episode — a contrarian claim, shocking stat, bold prediction, or provocative opinion that makes someone need to click "Show More"
+- Create a curiosity gap around that hot take, or use a near-direct quote from the guest
 - NOT start with "In this episode..." (boring, generic, wastes the hook space)
 - NOT start with the guest's name unless they're Tier 1
 - Sound like a human wrote it, not an AI
-- Include 1-2 SEO keywords naturally
+- Include 1-2 SEO keywords naturally (secondary to the hot take hook)
 
 ### GOOD opening lines:
 - "Is an AI already running a billion-dollar company? The hosts make the case — and the evidence is more compelling than you'd think."
