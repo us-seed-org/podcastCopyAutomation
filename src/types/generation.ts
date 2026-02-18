@@ -27,6 +27,7 @@ export interface TitleOption {
   platformNotes: string;
   thumbnailText?: string;
   thumbnailTextScore?: ThumbnailTextScore;
+  sourceModel?: string;
 }
 
 export interface RejectedTitle {

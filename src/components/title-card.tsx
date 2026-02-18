@@ -63,7 +63,7 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <div className="bg-red-600 text-white font-black text-xl tracking-wide px-4 py-2.5 rounded-lg shadow-md uppercase leading-tight">
+              <div className="bg-red-500/80 text-white font-black text-xl tracking-wide px-4 py-2.5 rounded-lg shadow-sm uppercase leading-tight">
                 {title.thumbnailText}
               </div>
               <CopyButton text={title.thumbnailText} label="Copy" />

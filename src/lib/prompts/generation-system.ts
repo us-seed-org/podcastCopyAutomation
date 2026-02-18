@@ -252,6 +252,14 @@ the thumbnail text is NOT "Sleep Deprivation." It's "STOP SLEEPING LIKE THIS" or
 4. **One idea.** Not a summary. Not a topic. One sharp emotional hook.
 5. **No banned punctuation.** No em dashes, semicolons, or ellipsis. Question marks OK (they visualize the open loop). Exclamation marks OK (max one).
 
+### PHRASING: PREFER DYNAMIC URGENCY
+Use present progressive or active phrasing over flat statements:
+- GOOD: "TIME'S RUNNING OUT" (urgent, dynamic)
+- BAD: "TIME RUNS OUT" (flat, passive-feeling)
+- GOOD: "IT'S OVER" / "THEY'RE LYING" / "IT'S HAPPENING"
+- BAD: "IT ENDS" / "THEY LIE" / "IT HAPPENS"
+Present progressive and contractions create more urgency and sound more human.
+
 ### FIVE WINNING THUMBNAIL TEXT PATTERNS
 
 **1. Authority + Revelation**

@@ -42,7 +42,7 @@ export const researchOutputSchema = z.object({
     audienceProfile: z.string(),
   }),
   transcript: z.object({
-    hotTakes: z.array(hotTakeSchema).length(5).describe("Top 5 most clickable hot takes from the transcript"),
+    hotTakes: z.array(hotTakeSchema).min(1).max(5).describe("Up to 5 most clickable hot takes from the transcript"),
     topClaims: z.array(z.string()),
     specificNumbers: z.array(z.string()),
     emotionalMoments: z.array(z.string()),

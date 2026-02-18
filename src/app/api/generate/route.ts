@@ -1,5 +1,5 @@
 import { generateObject, generateText } from "ai";
-import { generationModel, scoringModel } from "@/lib/ai";
+import { generationModel, minimaxGenerationModel, kimiModel, scoringModel } from "@/lib/ai";
 import {
   buildGenerationSystemPrompt,
   buildGenerationUserPrompt,
@@ -10,13 +10,67 @@ import {
 } from "@/lib/prompts/scoring-system";
 import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
 import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
+import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema } from "@/lib/schemas/generation-output";
 import { checkAiSlop, checkThumbnailText } from "@/lib/guardrails/ai-slop";
 import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
 
 export const maxDuration = 300;
 
-const REWRITE_THRESHOLD = 65;
+interface ScoreBreakdown {
+  curiosityGap: number;
+  authoritySignal: number;
+  emotionalTrigger: number;
+  trendingKeyword: number;
+  specificity: number;
+  characterCount: number;
+  wordBalance: number;
+  frontLoadHook: number;
+  thumbnailComplement: number;
+  total: number;
+}
+
+interface ThumbnailTextScore {
+  curiosityGap: number;
+  emotionalPunch: number;
+  titleComplement: number;
+  brevityAndClarity: number;
+  total: number;
+}
+
+interface BaseTitleItem {
+  title: string;
+  score?: ScoreBreakdown;
+  scrollStopReason?: string;
+  emotionalTrigger?: string;
+  platformNotes?: string;
+  sourceModel?: string;
+}
+
+interface YouTubeTitleItem extends BaseTitleItem {
+  thumbnailText?: string;
+  thumbnailTextScore?: ThumbnailTextScore;
+}
+
+interface SpotifyTitleItem extends BaseTitleItem {
+  // Spotify titles don't have thumbnail fields
+}
+
+interface ScoredTitle {
+  title: string;
+  rejectionReason: string;
+}
+
+interface GenerationResult {
+  youtubeTitles: YouTubeTitleItem[];
+  spotifyTitles: SpotifyTitleItem[];
+  rejectedTitles: ScoredTitle[];
+}
+
+const REWRITE_THRESHOLD = 70;
 const MAX_REWRITE_ATTEMPTS = 3;
+const TARGET_YOUTUBE_COUNT = 4;
+const TARGET_SPOTIFY_COUNT = 2;
+const REWRITE_MODEL_NAME = "GPT-5.2 (rewrite)";
 
 function sendSSE(
   controller: ReadableStreamDefaultController,
@@ -26,11 +80,8 @@ function sendSSE(
   controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
 }
 
-function getAllTitleTexts(generated: any): string[] {
-  const titles: string[] = [];
-  for (const t of generated.youtubeTitles || []) titles.push(t.title);
-  for (const t of generated.spotifyTitles || []) titles.push(t.title);
-  return titles;
+function getAllTitleTexts(titles: { title: string }[]): string[] {
+  return titles.map((t) => t.title);
 }
 
 function extractFirstJson(text: string): string | null {
@@ -41,7 +92,7 @@ function extractFirstJson(text: string): string | null {
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
     if (inString) {
-      if (ch === "\\" ) {
+      if (ch === "\\") {
         i++; // skip escaped character
       } else if (ch === '"') {
         inString = false;
@@ -58,6 +109,48 @@ function extractFirstJson(text: string): string | null {
     }
   }
   return null;
+}
+
+interface GenerationModelConfig {
+  model: Parameters<typeof generateObject>[0]["model"];
+  name: string;
+}
+
+async function generateWithModel(
+  config: GenerationModelConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<GenerationResult | null> {
+  try {
+    const result = await generateObject({
+      model: config.model,
+      schema: titleGenerationOutputSchema,
+      system: systemPrompt,
+      prompt: userPrompt,
+    });
+    return result.object as GenerationResult;
+  } catch (err) {
+    console.warn(`[PASS 1] generateObject failed for ${config.name}, falling back to generateText:`, err);
+    try {
+      const fallback = await generateText({
+        model: config.model,
+        system: systemPrompt,
+        prompt: userPrompt,
+      });
+      const jsonStr = extractFirstJson(fallback.text);
+      if (!jsonStr) return null;
+      const parsed = JSON.parse(jsonStr);
+      const validated = titleGenerationOutputSchema.safeParse(parsed);
+      if (!validated.success) {
+        console.warn("Fallback validation failed:", validated.error);
+        return null;
+      }
+      return validated.data;
+    } catch (err2) {
+      console.warn(`[PASS 1] generateText also failed for ${config.name}:`, err2);
+      return null;
+    }
+  }
 }
 
 export async function POST(request: Request) {
@@ -102,12 +195,7 @@ export async function POST(request: Request) {
           const guestCredential =
             researchObj?.guest?.authorityLabel || undefined;
 
-          // === PASS 1: Generate titles + thumbnail text ===
-          sendSSE(controller, encoder, {
-            type: "status",
-            message: "Generating titles + thumbnail text...",
-          });
-
+          // === PASS 1: Multi-model parallel generation ===
           const systemPrompt = buildGenerationSystemPrompt();
           const userPrompt = buildGenerationUserPrompt({
             research: researchStr,
@@ -116,93 +204,123 @@ export async function POST(request: Request) {
             episodeDescription,
           });
 
-          let generated: any;
-          try {
-            const result = await generateObject({
-              model: generationModel,
-              schema: titleGenerationOutputSchema,
-              system: systemPrompt,
-              prompt: userPrompt,
-            });
-            generated = result.object;
-          } catch (err) {
-            // Fallback: try generateText and parse JSON manually
-            console.warn("[PASS 1] generateObject failed, falling back to generateText:", err);
-            const fallback = await generateText({
-              model: generationModel,
-              system: systemPrompt,
-              prompt: userPrompt,
-            });
-            const jsonStr = extractFirstJson(fallback.text);
-            if (!jsonStr) {
-              sendSSE(controller, encoder, {
-                type: "error",
-                message: "Failed to generate titles",
-              });
-              controller.close();
-              return;
+          const models: GenerationModelConfig[] = [
+            { model: generationModel, name: "GPT-5.2" },
+            { model: generationModel, name: "GPT-5.2 (B)" },
+            { model: minimaxGenerationModel, name: "Minimax M2.5" },
+            ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
+          ];
+
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: `Generating titles with ${models.length} models in parallel (${models.map((m) => m.name).join(", ")})...`,
+          });
+
+          const results = await Promise.allSettled(
+            models.map((m) => generateWithModel(m, systemPrompt, userPrompt))
+          );
+
+          // Merge successful results
+          let allYoutubeTitles: any[] = [];
+          let allSpotifyTitles: any[] = [];
+          let allRejectedTitles: any[] = [];
+          const succeededModels: string[] = [];
+
+          results.forEach((result, idx) => {
+            const modelName = models[idx].name;
+            if (result.status === "fulfilled" && result.value) {
+              succeededModels.push(modelName);
+              const gen = result.value;
+              // Tag each title with its source model
+              for (const t of gen.youtubeTitles || []) {
+                allYoutubeTitles.push({ ...t, sourceModel: modelName });
+              }
+              for (const t of gen.spotifyTitles || []) {
+                allSpotifyTitles.push({ ...t, sourceModel: modelName });
+              }
+              allRejectedTitles.push(...(gen.rejectedTitles || []));
+            } else {
+              const reason = result.status === "rejected" ? result.reason : "returned null";
+              console.warn(`[PASS 1] ${modelName} failed:`, reason);
             }
-            generated = JSON.parse(jsonStr);
+          });
+
+          if (allYoutubeTitles.length === 0) {
+            sendSSE(controller, encoder, {
+              type: "error",
+              message: "All generation models failed. No titles produced.",
+            });
+            controller.close();
+            return;
           }
 
-          // Run guardrails on initial titles + thumbnail text
-          const slopCheck = checkAiSlop(getAllTitleTexts(generated));
-          const tierCheck = checkTierCompliance(
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: `${succeededModels.length}/${models.length} models succeeded (${succeededModels.join(", ")}). Got ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles.`,
+          });
+
+          // Run guardrails on merged set — filter out violating titles instead of re-generating
+          const ytSlopCheck = checkAiSlop(getAllTitleTexts(allYoutubeTitles));
+          const ytTierCheck = checkTierCompliance(
             guestName,
             guestTier,
             guestCredential,
-            (generated.youtubeTitles || []).map((t: any) => t.title)
+            allYoutubeTitles.map((t: any) => t.title)
           );
-          const thumbCheck = checkThumbnailText(
-            (generated.youtubeTitles || []).map((t: any) => ({
+          const ytThumbCheck = checkThumbnailText(
+            allYoutubeTitles.map((t: any) => ({
               thumbnailText: t.thumbnailText || "",
               title: t.title,
             }))
           );
 
-          if (!slopCheck.passed || !tierCheck.passed || !thumbCheck.passed) {
-            const allViolations = [
-              ...slopCheck.violations,
-              ...tierCheck.violations,
-              ...thumbCheck.violations,
-            ];
+          // If guardrail violations exist, log them but keep titles (scoring will penalize them)
+          const allViolations = [
+            ...ytSlopCheck.violations,
+            ...ytTierCheck.violations,
+            ...ytThumbCheck.violations,
+          ];
+          if (allViolations.length > 0) {
             sendSSE(controller, encoder, {
               type: "status",
-              message: `Guardrail violations detected (${allViolations.length}), re-generating titles...`,
+              message: `${allViolations.length} guardrail violation(s) detected — scoring will penalize affected titles.`,
             });
-
-            const violationFeedback = `## GUARDRAIL VIOLATIONS — FIX THESE
-
-The following violations were detected in your output. You MUST fix all of them:
-
-${allViolations.map((v) => `- ${v}`).join("\n")}
-
-Re-generate ALL titles, ensuring NONE of these violations remain.`;
-
-            try {
-              const fixResult = await generateObject({
-                model: generationModel,
-                schema: titleGenerationOutputSchema,
-                system: systemPrompt,
-                prompt: userPrompt + "\n\n" + violationFeedback,
-              });
-              generated = fixResult.object;
-            } catch {
-              // Keep original if fix attempt fails
-              console.warn("[PASS 1] Guardrail re-generation failed, keeping originals");
-            }
           }
 
-          // === PASS 2: Score titles independently with Minimax M2.5 ===
+          // Also check Spotify titles
+          const spSlopCheck = checkAiSlop(getAllTitleTexts(allSpotifyTitles));
+          if (!spSlopCheck.passed) {
+            console.warn("[PASS 1] Spotify guardrail violations:", spSlopCheck.violations);
+          }
+
+          // === PASS 2: Score all titles with Minimax M2.5 ===
           sendSSE(controller, encoder, {
             type: "status",
-            message:
-              "Scoring titles independently with cross-model evaluator...",
+            message: `Scoring ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles with independent evaluator...`,
           });
 
           const scoringPrompt = buildScoringSystemPrompt();
+          const titlesToScore = {
+            youtubeTitles: allYoutubeTitles.map((t: any) => ({
+              title: t.title,
+              thumbnailText: t.thumbnailText,
+              score: t.score,
+              thumbnailTextScore: t.thumbnailTextScore,
+              scrollStopReason: t.scrollStopReason,
+              emotionalTrigger: t.emotionalTrigger,
+              platformNotes: t.platformNotes,
+            })),
+            spotifyTitles: allSpotifyTitles.map((t: any) => ({
+              title: t.title,
+              score: t.score,
+              scrollStopReason: t.scrollStopReason,
+              emotionalTrigger: t.emotionalTrigger,
+              platformNotes: t.platformNotes,
+            })),
+          };
+
           const scoringInput = buildScoringUserPrompt({
-            generatedTitles: JSON.stringify(generated, null, 2),
+            generatedTitles: JSON.stringify(titlesToScore, null, 2),
             research: researchStr,
           });
 
@@ -216,59 +334,106 @@ Re-generate ALL titles, ensuring NONE of these violations remain.`;
             });
             scored = scoreResult.object;
           } catch (err) {
-            console.warn("[PASS 2] Cross-model scoring failed, falling back to generation model:", err);
-            // Fallback to generation model for scoring
-            try {
-              const scoreResult = await generateObject({
-                model: generationModel,
-                schema: scoringOutputSchema,
-                system: scoringPrompt,
-                prompt: scoringInput,
+            console.warn("[PASS 2] Scoring failed:", err);
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: "Scoring failed — continuing with self-assessed scores",
+            });
+          }
+
+          // Merge scores back onto titles using lookup map by normalized title
+          if (scored) {
+            const normalizeTitle = (title: string) => title.toLowerCase().trim();
+            const ytScoreLookup = new Map<string, any>();
+            if (scored.youtubeTitles) {
+              for (const scoredItem of scored.youtubeTitles) {
+                if (scoredItem.title) {
+                  ytScoreLookup.set(normalizeTitle(scoredItem.title), scoredItem);
+                }
+              }
+            }
+            const spScoreLookup = new Map<string, any>();
+            if (scored.spotifyTitles) {
+              for (const scoredItem of scored.spotifyTitles) {
+                if (scoredItem.title) {
+                  spScoreLookup.set(normalizeTitle(scoredItem.title), scoredItem);
+                }
+              }
+            }
+            if (ytScoreLookup.size > 0) {
+              allYoutubeTitles = allYoutubeTitles.map((t: any) => {
+                const key = normalizeTitle(t.title);
+                const scoredItem = ytScoreLookup.get(key);
+                if (scoredItem) {
+                  return {
+                    ...t,
+                    score: scoredItem.score ?? t.score,
+                    scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
+                    platformNotes: scoredItem.platformNotes ?? t.platformNotes,
+                    thumbnailTextScore: scoredItem.thumbnailTextScore ?? t.thumbnailTextScore,
+                  };
+                }
+                return t;
               });
-              scored = scoreResult.object;
-            } catch (err2) {
-              console.warn("[PASS 2] Scoring fallback also failed:", err2);
-              sendSSE(controller, encoder, {
-                type: "status",
-                message:
-                  "Scoring failed — continuing with self-assessed scores",
+            }
+            if (spScoreLookup.size > 0) {
+              allSpotifyTitles = allSpotifyTitles.map((t: any) => {
+                const key = normalizeTitle(t.title);
+                const scoredItem = spScoreLookup.get(key);
+                if (scoredItem) {
+                  return {
+                    ...t,
+                    score: scoredItem.score ?? t.score,
+                    scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
+                    platformNotes: scoredItem.platformNotes ?? t.platformNotes,
+                  };
+                }
+                return t;
               });
             }
           }
 
-          // Merge scores onto generated titles (including thumbnail text scores for YouTube)
-          if (scored) {
-            if (generated.youtubeTitles && scored.youtubeTitles) {
-              generated.youtubeTitles = generated.youtubeTitles.map(
-                (t: any, i: number) => ({
-                  ...t,
-                  score: scored.youtubeTitles?.[i]?.score || t.score,
-                  scrollStopReason:
-                    scored.youtubeTitles?.[i]?.scrollStopReason ||
-                    t.scrollStopReason,
-                  platformNotes:
-                    scored.youtubeTitles?.[i]?.platformNotes || t.platformNotes,
-                  thumbnailTextScore:
-                    scored.youtubeTitles?.[i]?.thumbnailTextScore ||
-                    t.thumbnailTextScore,
-                })
-              );
-            }
-            if (generated.spotifyTitles && scored.spotifyTitles) {
-              generated.spotifyTitles = generated.spotifyTitles.map(
-                (t: any, i: number) => ({
-                  ...t,
-                  score: scored.spotifyTitles?.[i]?.score || t.score,
-                  scrollStopReason:
-                    scored.spotifyTitles?.[i]?.scrollStopReason ||
-                    t.scrollStopReason,
-                  platformNotes:
-                    scored.spotifyTitles?.[i]?.platformNotes || t.platformNotes,
-                })
-              );
-            }
-            generated.tierClassification = scored.tierClassification;
+          // === Selection: Keep top titles by score ===
+          allYoutubeTitles.sort(
+            (a: any, b: any) => (b.score?.total || 0) - (a.score?.total || 0)
+          );
+          allSpotifyTitles.sort(
+            (a: any, b: any) => (b.score?.total || 0) - (a.score?.total || 0)
+          );
+
+          const selectedYoutube = allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
+          const selectedSpotify = allSpotifyTitles.slice(0, TARGET_SPOTIFY_COUNT);
+
+          // Add eliminated titles to rejected list
+          const eliminatedYT = allYoutubeTitles.slice(TARGET_YOUTUBE_COUNT);
+          const eliminatedSP = allSpotifyTitles.slice(TARGET_SPOTIFY_COUNT);
+          for (const t of eliminatedYT) {
+            const safeScore = t.score?.total ?? 'N/A';
+            allRejectedTitles.push({
+              title: t.title,
+              rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel})`,
+            });
           }
+          for (const t of eliminatedSP) {
+            const safeScore = t.score?.total ?? 'N/A';
+            allRejectedTitles.push({
+              title: t.title,
+              rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel})`,
+            });
+          }
+
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: `Selected top ${selectedYoutube.length} YouTube + ${selectedSpotify.length} Spotify titles.`,
+          });
+
+          // Build merged output
+          const generated: any = {
+            youtubeTitles: selectedYoutube,
+            spotifyTitles: selectedSpotify,
+            rejectedTitles: allRejectedTitles,
+            tierClassification: scored?.tierClassification,
+          };
 
           // === PASS 3: Iterative rewrite loop (up to 3 attempts) ===
           for (
@@ -388,7 +553,9 @@ Return the same JSON structure. Score honestly against the calibration benchmark
 
             // Run guardrails on rewritten titles
             const rewriteSlopCheck = checkAiSlop(
-              getAllTitleTexts(rewritten)
+              getAllTitleTexts(rewritten.youtubeTitles || []).concat(
+                getAllTitleTexts(rewritten.spotifyTitles || [])
+              )
             );
             const rewriteTierCheck = checkTierCompliance(
               guestName,
@@ -402,7 +569,6 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                 `[PASS 3] Rewrite attempt ${attempt} has guardrail violations:`,
                 [...rewriteSlopCheck.violations, ...rewriteTierCheck.violations]
               );
-              // Continue to scoring anyway — we'll try again next iteration
             }
 
             // Re-score rewritten titles
@@ -419,21 +585,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               });
               rewriteScored = scoreResult.object;
             } catch {
-              console.warn(`[PASS 3] Re-scoring attempt ${attempt} failed with cross-model, trying generation model`);
-              try {
-                const scoreResult = await generateObject({
-                  model: generationModel,
-                  schema: scoringOutputSchema,
-                  system: scoringPrompt,
-                  prompt: buildScoringUserPrompt({
-                    generatedTitles: JSON.stringify(rewritten, null, 2),
-                    research: researchStr,
-                  }),
-                });
-                rewriteScored = scoreResult.object;
-              } catch {
-                console.warn(`[PASS 3] Re-scoring fallback also failed`);
-              }
+              console.warn(`[PASS 3] Re-scoring attempt ${attempt} failed`);
             }
 
             // Merge rewritten titles into generated, replacing weak ones
@@ -455,6 +607,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                     rewriteScored?.youtubeTitles?.[ri]?.thumbnailTextScore ||
                     rewrittenItem.thumbnailTextScore ||
                     generated.youtubeTitles[originalIndex].thumbnailTextScore,
+                  sourceModel: REWRITE_MODEL_NAME,
                   rewritten: true,
                 };
               }
@@ -473,6 +626,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                     rewriteScored?.spotifyTitles?.[ri]?.score ||
                     rewrittenItem.score ||
                     generated.spotifyTitles[originalIndex].score,
+                  sourceModel: REWRITE_MODEL_NAME,
                   rewritten: true,
                 };
               }
