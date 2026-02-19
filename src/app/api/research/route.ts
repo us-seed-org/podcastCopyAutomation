@@ -61,7 +61,14 @@ export async function POST(request: Request) {
               audienceProfile: targetAudience || "General audience interested in discussed topics",
             },
             transcript: {
-              hotTakes: [],
+              hotTakes: [
+                {
+                  quote: "This episode is topic-driven with no external guest",
+                  topic: "Episode overview",
+                  whyClickable: "Content is driven by the hosts' discussion",
+                  type: "provocative_opinion",
+                },
+              ],
               topClaims: [],
               specificNumbers: [],
               emotionalMoments: [],
