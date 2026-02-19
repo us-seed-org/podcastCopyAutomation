@@ -1,5 +1,5 @@
 import { generateObject, generateText } from "ai";
-import { generationModel, minimaxGenerationModel, kimiModel, scoringModel } from "@/lib/ai";
+import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, pairwiseJudgeModel } from "@/lib/ai";
 import {
   buildGenerationSystemPrompt,
   buildGenerationUserPrompt,
@@ -13,6 +13,7 @@ import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
 import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema } from "@/lib/schemas/generation-output";
 import { checkAiSlop, checkThumbnailText } from "@/lib/guardrails/ai-slop";
 import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
+import { runPairwiseTournament } from "@/lib/pairwise-tournament";
 
 export const maxDuration = 300;
 
@@ -49,6 +50,21 @@ interface BaseTitleItem {
 interface YouTubeTitleItem extends BaseTitleItem {
   thumbnailText?: string;
   thumbnailTextScore?: ThumbnailTextScore;
+  pairwiseWins?: number;
+  pairwiseRank?: number;
+}
+
+interface YoutubeTitle {
+  title: string;
+  thumbnailText?: string;
+  thumbnailTextScore?: ThumbnailTextScore;
+  score?: ScoreBreakdown;
+  scrollStopReason?: string;
+  emotionalTrigger?: string;
+  platformNotes?: string;
+  sourceModel?: string;
+  pairwiseWins?: number;
+  pairwiseRank?: number;
 }
 
 interface SpotifyTitleItem extends BaseTitleItem {
@@ -71,6 +87,7 @@ const MAX_REWRITE_ATTEMPTS = 3;
 const TARGET_YOUTUBE_COUNT = 4;
 const TARGET_SPOTIFY_COUNT = 2;
 const REWRITE_MODEL_NAME = "GPT-5.2 (rewrite)";
+const PAIRWISE_TOP_N = 6;
 
 function sendSSE(
   controller: ReadableStreamDefaultController,
@@ -221,7 +238,7 @@ export async function POST(request: Request) {
           );
 
           // Merge successful results
-          let allYoutubeTitles: any[] = [];
+          let allYoutubeTitles: YoutubeTitle[] = [];
           let allSpotifyTitles: any[] = [];
           let allRejectedTitles: any[] = [];
           const succeededModels: string[] = [];
@@ -393,10 +410,78 @@ export async function POST(request: Request) {
             }
           }
 
-          // === Selection: Keep top titles by score ===
-          allYoutubeTitles.sort(
-            (a: any, b: any) => (b.score?.total || 0) - (a.score?.total || 0)
-          );
+          // === PASS 2.5: Pairwise Tournament (Gemini) ===
+          const normalizeTitle = (title: string) => title.toLowerCase().trim();
+          if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Running pairwise tournament on top ${PAIRWISE_TOP_N} YouTube titles with Gemini (${(PAIRWISE_TOP_N * (PAIRWISE_TOP_N - 1)) / 2} unique pairs)...`,
+            });
+
+            try {
+              const tournamentInput = allYoutubeTitles.map((t) => ({
+                title: t.title,
+                thumbnailText: t.thumbnailText || "",
+                score: { total: t.score?.total || 0 },
+              }));
+
+              const tournament = await runPairwiseTournament(
+                tournamentInput,
+                episodeDescription,
+                PAIRWISE_TOP_N
+              );
+
+              if (tournament) {
+                sendSSE(controller, encoder, {
+                  type: "status",
+                  message: `${tournament.consistentPairs}/${(PAIRWISE_TOP_N * (PAIRWISE_TOP_N - 1)) / 2} unique pairs had consistent results`,
+                });
+
+                const rankedTitles = tournament.titles.map((t, idx) => ({
+                  ...t,
+                  pairwiseWins: tournament.wins.get(idx) || 0,
+                }));
+
+                rankedTitles.sort((a, b) => {
+                  if (b.pairwiseWins !== a.pairwiseWins) {
+                    return b.pairwiseWins - a.pairwiseWins;
+                  }
+                  return (b.score?.total || 0) - (a.score?.total || 0);
+                });
+
+                const rankedWithPairwiseRank = rankedTitles.map((t, idx) => ({
+                  ...t,
+                  pairwiseRank: idx + 1,
+                }));
+
+                allYoutubeTitles = allYoutubeTitles.map((t) => {
+                  const ranked = rankedWithPairwiseRank.find((rt) => normalizeTitle(rt.title) === normalizeTitle(t.title));
+                  return ranked
+                    ? { ...t, pairwiseWins: ranked.pairwiseWins, pairwiseRank: ranked.pairwiseRank }
+                    : t;
+                });
+              }
+            } catch (error) {
+              console.error("[Pairwise] Tournament failed:", error);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: "Pairwise tournament failed, proceeding with score-based selection",
+              });
+            }
+          }
+
+          // === Selection: Keep top titles by pairwise rank (or score if no tournament) ===
+          const hasPairwiseData = allYoutubeTitles.some((t: any) => t.pairwiseRank !== undefined);
+          allYoutubeTitles.sort((a: any, b: any) => {
+            if (hasPairwiseData) {
+              if (a.pairwiseRank !== undefined && b.pairwiseRank !== undefined) {
+                return a.pairwiseRank - b.pairwiseRank;
+              }
+              if (a.pairwiseRank !== undefined) return -1;
+              if (b.pairwiseRank !== undefined) return 1;
+            }
+            return (b.score?.total || 0) - (a.score?.total || 0);
+          });
           allSpotifyTitles.sort(
             (a: any, b: any) => (b.score?.total || 0) - (a.score?.total || 0)
           );
@@ -409,9 +494,10 @@ export async function POST(request: Request) {
           const eliminatedSP = allSpotifyTitles.slice(TARGET_SPOTIFY_COUNT);
           for (const t of eliminatedYT) {
             const safeScore = t.score?.total ?? 'N/A';
+            const pairwiseInfo = t.pairwiseRank !== undefined ? `, pairwise rank #${t.pairwiseRank} (${t.pairwiseWins}W)` : '';
             allRejectedTitles.push({
               title: t.title,
-              rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel})`,
+              rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel}${pairwiseInfo})`,
             });
           }
           for (const t of eliminatedSP) {

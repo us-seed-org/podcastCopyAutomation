@@ -28,6 +28,8 @@ export interface TitleOption {
   thumbnailText?: string;
   thumbnailTextScore?: ThumbnailTextScore;
   sourceModel?: string;
+  pairwiseWins?: number;
+  pairwiseRank?: number;
 }
 
 export interface RejectedTitle {
