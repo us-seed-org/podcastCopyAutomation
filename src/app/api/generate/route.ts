@@ -1,5 +1,5 @@
 import { generateObject, generateText } from "ai";
-import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, pairwiseJudgeModel } from "@/lib/ai";
+import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, pairwiseJudgeModel, geminiGenerationModel } from "@/lib/ai";
 import {
   buildGenerationSystemPrompt,
   buildGenerationUserPrompt,
@@ -16,6 +16,19 @@ import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
 import { runPairwiseTournament } from "@/lib/pairwise-tournament";
 
 export const maxDuration = 300;
+
+function extractKeyNouns(title: string): string[] {
+  const stopwords = new Set(["the", "a", "an", "is", "are", "was", "and", "or", "of", "in", "to", "for", "on", "with", "by", "from", "at"]);
+  return title.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/)
+    .filter(w => w.length >= 3 && !stopwords.has(w));
+}
+
+function areSameAngle(a: string, b: string): boolean {
+  const kA = new Set(extractKeyNouns(a));
+  const kB = extractKeyNouns(b);
+  const overlap = kB.filter(k => kA.has(k)).length;
+  return overlap >= 2;
+}
 
 interface ScoreBreakdown {
   curiosityGap: number;
@@ -222,11 +235,15 @@ export async function POST(request: Request) {
           });
 
           const models: GenerationModelConfig[] = [
-            { model: generationModel, name: "GPT-5.2" },
-            { model: generationModel, name: "GPT-5.2 (B)" },
+            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "GPT-5.2" },
+            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro (B)" : "GPT-5.2 (B)" },
             { model: minimaxGenerationModel, name: "Minimax M2.5" },
             ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
           ];
+
+          // Extract hot takes for per-model angle diversity
+          const hotTakes: Array<{ quote: string; topic: string; whyClickable: string }> =
+            researchObj?.transcript?.hotTakes || [];
 
           sendSSE(controller, encoder, {
             type: "status",
@@ -234,7 +251,13 @@ export async function POST(request: Request) {
           });
 
           const results = await Promise.allSettled(
-            models.map((m) => generateWithModel(m, systemPrompt, userPrompt))
+            models.map((m, idx) => {
+              const assignedHotTake = hotTakes[idx % hotTakes.length];
+              const angleInstruction = assignedHotTake
+                ? `\n\n## YOUR ASSIGNED ANGLE\nLead your strongest title with this specific hot take as the primary hook:\n"${assignedHotTake.quote}" (${assignedHotTake.topic})\nYour other titles may explore different angles from the episode.`
+                : "";
+              return generateWithModel(m, systemPrompt, userPrompt + angleInstruction);
+            })
           );
 
           // Merge successful results
@@ -275,6 +298,20 @@ export async function POST(request: Request) {
             type: "status",
             message: `${succeededModels.length}/${models.length} models succeeded (${succeededModels.join(", ")}). Got ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles.`,
           });
+
+          // Semantic deduplication: keep max 2 titles per angle cluster before scoring
+          const dedupedYoutube: typeof allYoutubeTitles = [];
+          for (const candidate of allYoutubeTitles) {
+            const sameAngleCount = dedupedYoutube.filter(t => areSameAngle(t.title, candidate.title)).length;
+            if (sameAngleCount < 2) dedupedYoutube.push(candidate);
+          }
+          if (dedupedYoutube.length < allYoutubeTitles.length) {
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Deduplicated ${allYoutubeTitles.length - dedupedYoutube.length} redundant angle(s). ${dedupedYoutube.length} distinct titles remaining.`,
+            });
+          }
+          allYoutubeTitles = dedupedYoutube;
 
           // Run guardrails on merged set — filter out violating titles instead of re-generating
           const ytSlopCheck = checkAiSlop(getAllTitleTexts(allYoutubeTitles));

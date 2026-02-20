@@ -1,4 +1,5 @@
-import { generateText, stepCountIs } from "ai";
+import { generateObject, generateText, stepCountIs } from "ai";
+import { z } from "zod";
 import { researchModel } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
 import { researchOutputSchema } from "@/lib/schemas/research-output";
@@ -37,8 +38,58 @@ export async function POST(request: Request) {
         async start(controller) {
           sendSSE(controller, encoder, {
             type: "status",
-            message: "No external guest - using topic-based generation...",
+            message: "No external guest - extracting hot takes from transcript...",
           });
+
+          const hotTakeExtractionSchema = z.object({
+            hotTakes: z.array(z.object({
+              quote: z.string(),
+              topic: z.string(),
+              whyClickable: z.string(),
+              type: z.enum(["contrarian", "shocking_stat", "bold_prediction", "debunking", "provocative_opinion"]),
+            })).min(3).max(5),
+          });
+
+          let extractedHotTakes: Array<{ quote: string; topic: string; whyClickable: string; type: string }> = [];
+          try {
+            const hotTakeResult = await generateObject({
+              model: researchModel,
+              schema: hotTakeExtractionSchema,
+              system: `You extract the most clickable hot takes from podcast transcripts.
+A hot take is a moment that would make someone STOP scrolling — a contrarian claim, shocking stat, bold prediction, debunking, or provocative opinion.
+CRITICAL: Extract 3–5 hot takes that span DIFFERENT topic areas or segments of the episode.
+Do NOT extract multiple hot takes about the same overarching theme — if two candidates are on the same subject, keep only the stronger one and find a hot take from a different part of the transcript.
+Each hot take must be anchored in a specific quote or claim, not a vague summary.`,
+              prompt: `Extract the top hot takes from this podcast transcript:\n\n${transcript.slice(0, 8000)}`,
+            });
+            extractedHotTakes = hotTakeResult.object.hotTakes;
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Extracted ${extractedHotTakes.length} hot takes from transcript.`,
+            });
+          } catch (err) {
+            console.warn("[Research] Hot take extraction failed, using fallback:", err);
+            extractedHotTakes = [
+              {
+                quote: "This episode has no external guest — the hosts drive the entire conversation",
+                topic: "Format overview",
+                whyClickable: "Rare format signals a host-led deep dive",
+                type: "provocative_opinion" as const,
+              },
+              {
+                quote: "The hosts share a direct, specific take on the main topic of this episode",
+                topic: "Core argument",
+                whyClickable: "Direct host opinion is more trustworthy than an expert interview",
+                type: "contrarian" as const,
+              },
+              {
+                quote: "A concrete actionable insight is revealed in this episode",
+                topic: "Actionable takeaway",
+                whyClickable: "Specific actionable content outperforms general advice",
+                type: "provocative_opinion" as const,
+              },
+            ];
+          }
 
           const noGuestResearch = {
             guest: {
@@ -61,14 +112,7 @@ export async function POST(request: Request) {
               audienceProfile: targetAudience || "General audience interested in discussed topics",
             },
             transcript: {
-              hotTakes: [
-                {
-                  quote: "This episode is topic-driven with no external guest",
-                  topic: "Episode overview",
-                  whyClickable: "Content is driven by the hosts' discussion",
-                  type: "provocative_opinion",
-                },
-              ],
+              hotTakes: extractedHotTakes,
               topClaims: [],
               specificNumbers: [],
               emotionalMoments: [],

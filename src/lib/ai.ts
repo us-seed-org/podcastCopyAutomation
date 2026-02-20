@@ -43,10 +43,16 @@ export const kimiModel = nvidiaProvider
   ? nvidiaProvider(process.env.KIMI_MODEL || "kimi-k2.5")
   : null;
 
-export const pairwiseJudgeModel = googleProvider
-  ? googleProvider(process.env.PAIRWISE_JUDGE_MODEL || "gemini-3.0-flash")
+// Primary generation: Gemini 3.1 Pro Preview. null if GOOGLE_API_KEY is not set;
+// generate/route.ts falls back to GPT-5.2 (generationModel) at point of use.
+export const geminiGenerationModel = googleProvider
+  ? googleProvider(process.env.GEMINI_GENERATION_MODEL || "gemini-3.1-pro-preview")
   : null;
-// Minimax is well-calibrated for scoring — its interpretation of the rubric produces accurate scores
-export const scoringModel = minimaxProvider(
-  process.env.MINIMAX_SCORING_MODEL || process.env.SCORING_MODEL || "minimax-m2.5"
-);
+
+// Pairwise judge: Gemini 3.1 Pro Preview for stronger creative discrimination
+export const pairwiseJudgeModel = googleProvider
+  ? googleProvider(process.env.PAIRWISE_JUDGE_MODEL || "gemini-3.1-pro-preview")
+  : null;
+
+// Scorer: GPT-5.2 (cross-family from Gemini generators; stronger at rubric-following)
+export const scoringModel = openaiProvider(process.env.SCORING_MODEL || "gpt-5.2");
