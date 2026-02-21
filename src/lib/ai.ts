@@ -8,7 +8,7 @@ if (!process.env.OPENAI_API_KEY) {
   );
 }
 
-const openaiProvider = createOpenAI({
+export const openaiProvider = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 

@@ -1,6 +1,6 @@
 import { generateObject, generateText, stepCountIs } from "ai";
 import { z } from "zod";
-import { researchModel } from "@/lib/ai";
+import { researchModel, openaiProvider } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
 import { researchOutputSchema } from "@/lib/schemas/research-output";
 
@@ -189,10 +189,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
             system: systemPrompt,
             prompt: userPrompt,
             tools: {
-              web_search_preview: {
-                type: "provider-defined",
-                id: "openai.web_search_preview",
-              } as any,
+              web_search_preview: openaiProvider.tools.webSearchPreview({}),
             },
             stopWhen: stepCountIs(5),
           });
