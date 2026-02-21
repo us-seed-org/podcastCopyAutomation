@@ -6,6 +6,18 @@ import { researchOutputSchema } from "@/lib/schemas/research-output";
 
 export const maxDuration = 60;
 
+function sampleTranscript(text: string, totalChars = 8000): string {
+  if (text.length <= totalChars) return text;
+  const chunkSize = Math.floor(totalChars / 3);
+  const start = text.slice(0, chunkSize);
+  const mid = text.slice(
+    Math.floor(text.length / 2) - Math.floor(chunkSize / 2),
+    Math.floor(text.length / 2) + Math.ceil(chunkSize / 2)
+  );
+  const end = text.slice(text.length - chunkSize);
+  return `${start}\n\n---\n\n${mid}\n\n---\n\n${end}`;
+}
+
 function sendSSE(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: unknown) {
   controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
 }
@@ -60,7 +72,7 @@ A hot take is a moment that would make someone STOP scrolling — a contrarian c
 CRITICAL: Extract 3–5 hot takes that span DIFFERENT topic areas or segments of the episode.
 Do NOT extract multiple hot takes about the same overarching theme — if two candidates are on the same subject, keep only the stronger one and find a hot take from a different part of the transcript.
 Each hot take must be anchored in a specific quote or claim, not a vague summary.`,
-              prompt: `Extract the top hot takes from this podcast transcript:\n\n${transcript.slice(0, 8000)}`,
+              prompt: `Extract the top hot takes from this podcast transcript:\n\n${sampleTranscript(transcript)}`,
             });
             extractedHotTakes = hotTakeResult.object.hotTakes;
             sendSSE(controller, encoder, {

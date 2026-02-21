@@ -30,6 +30,10 @@ function areSameAngle(a: string, b: string): boolean {
   return overlap >= 2;
 }
 
+function normalizeTitle(title: string): string {
+  return title.toLowerCase().trim();
+}
+
 interface ScoreBreakdown {
   curiosityGap: number;
   authoritySignal: number;
@@ -241,29 +245,19 @@ export async function POST(request: Request) {
             ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
           ];
 
-          // Extract hot takes for per-model angle diversity
-          const hotTakes: Array<{ quote: string; topic: string; whyClickable: string }> =
-            researchObj?.transcript?.hotTakes || [];
-
           sendSSE(controller, encoder, {
             type: "status",
             message: `Generating titles with ${models.length} models in parallel (${models.map((m) => m.name).join(", ")})...`,
           });
 
           const results = await Promise.allSettled(
-            models.map((m, idx) => {
-              const assignedHotTake = hotTakes[idx % hotTakes.length];
-              const angleInstruction = assignedHotTake
-                ? `\n\n## YOUR ASSIGNED ANGLE\nLead your strongest title with this specific hot take as the primary hook:\n"${assignedHotTake.quote}" (${assignedHotTake.topic})\nYour other titles may explore different angles from the episode.`
-                : "";
-              return generateWithModel(m, systemPrompt, userPrompt + angleInstruction);
-            })
+            models.map((m) => generateWithModel(m, systemPrompt, userPrompt))
           );
 
           // Merge successful results
           let allYoutubeTitles: YoutubeTitle[] = [];
-          let allSpotifyTitles: any[] = [];
-          let allRejectedTitles: any[] = [];
+          let allSpotifyTitles: SpotifyTitleItem[] = [];
+          let allRejectedTitles: ScoredTitle[] = [];
           const succeededModels: string[] = [];
 
           results.forEach((result, idx) => {
@@ -364,7 +358,7 @@ export async function POST(request: Request) {
               emotionalTrigger: t.emotionalTrigger,
               platformNotes: t.platformNotes,
             })),
-            spotifyTitles: allSpotifyTitles.map((t: any) => ({
+            spotifyTitles: allSpotifyTitles.map((t) => ({
               title: t.title,
               score: t.score,
               scrollStopReason: t.scrollStopReason,
@@ -397,7 +391,6 @@ export async function POST(request: Request) {
 
           // Merge scores back onto titles using lookup map by normalized title
           if (scored) {
-            const normalizeTitle = (title: string) => title.toLowerCase().trim();
             const ytScoreLookup = new Map<string, any>();
             if (scored.youtubeTitles) {
               for (const scoredItem of scored.youtubeTitles) {
@@ -431,7 +424,7 @@ export async function POST(request: Request) {
               });
             }
             if (spScoreLookup.size > 0) {
-              allSpotifyTitles = allSpotifyTitles.map((t: any) => {
+              allSpotifyTitles = allSpotifyTitles.map((t) => {
                 const key = normalizeTitle(t.title);
                 const scoredItem = spScoreLookup.get(key);
                 if (scoredItem) {
@@ -448,7 +441,6 @@ export async function POST(request: Request) {
           }
 
           // === PASS 2.5: Pairwise Tournament (Gemini) ===
-          const normalizeTitle = (title: string) => title.toLowerCase().trim();
           if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
             sendSSE(controller, encoder, {
               type: "status",
@@ -520,7 +512,7 @@ export async function POST(request: Request) {
             return (b.score?.total || 0) - (a.score?.total || 0);
           });
           allSpotifyTitles.sort(
-            (a: any, b: any) => (b.score?.total || 0) - (a.score?.total || 0)
+            (a, b) => (b.score?.total || 0) - (a.score?.total || 0)
           );
 
           const selectedYoutube = allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
