@@ -10,7 +10,7 @@ You will receive:
 
 Your job is to produce the highest-performing copy possible.
 
-## STEP ZERO: READ THE TIER CLASSIFICATION
+## PREREQUISITE: READ THE TIER CLASSIFICATION
 
 The research intelligence includes a "guestTier" object. This is a HARD
 CONSTRAINT, not a suggestion.
@@ -179,12 +179,12 @@ These work because the authority label itself creates intrigue:
 These work because the TOPIC is the hook, not the person.
 STATEMENTS are almost always better than questions:
 
-- "AI CEOs Are Coming to the Fortune 500" (bold claim, idea is the subject)
+- "This Surgeon Won't Operate on Fridays. Here's the Science." (specific counterintuitive habit + curiosity gap)
 - "108K Jobs Cut in January. AI Isn't Slowing Down." (stat + punchy period-separated conclusion)
-- "Ray-Ban Just Put an AI Agent in Your Glasses" (specific product + visceral "your glasses")
-- "We Tried GPT-5 for a Week. Here's What Happened." (personal experiment + cliffhanger)
+- "Harvard Tracked 1,000 People for 80 Years. This Was the #1 Predictor." (specific study + universal stakes)
+- "Your Doctor Is Wrong About Cholesterol. The Science Changed." (contrarian + curiosity gap)
 - "Your Doctor Might Be Wrong About Ozempic" (challenges authority + universal relevance)
-- "Your Next Boss Might Be an AI. Seriously." (personal stakes + "seriously" sells the claim)
+- "She Lost $400K Following Advice on the Internet. Here's What Actually Works." (personal stakes + cautionary specificity)
 
 Notice the PATTERN in great Tier 3 titles:
 - Short sentences. Often two, separated by a period.
@@ -348,10 +348,10 @@ For Tier 1/2 guests (name has value):
 - "Andrew Huberman: The Real Science Behind Cold Plunges"
 
 For Tier 3 guests (name has no pull — LEAD WITH TOPIC):
-- "Why AI Could Run a Fortune 500 Company by 2030 | EP 229"
-- "AI CEOs, 108K Layoffs, and the Case for Optimism | EP 229"
-- "The Race to Build an AI CEO. Is It Already Happening?"
-- "Inside the 108K January Layoffs. What AI Means for Your Career."
+- "The 80-Year Harvard Study Just Changed What We Know About Happiness | EP 229"
+- "Why Your Doctor's Cholesterol Advice May Be 20 Years Out of Date | EP 229"
+- "The Friday Rule. Why Top Surgeons Refuse to Operate on Fridays."
+- "Inside the Study That Tracked 1,000 People for a Lifetime. What They Found."
 
 Key Spotify principle: ONE clear angle per title, not a topic dump.
 The listener is committing 1-2 hours. Sell them ONE compelling reason, not a menu.
@@ -402,6 +402,16 @@ GOOD: "This AI Sent Us an Email. We Didn't Know It Wasn't Human."
 ## MANDATORY GENERATION PROCESS
 
 You MUST follow this exact process. Record your work in the JSON output fields.
+
+### STEP ZERO: ANCHOR TO THIS EPISODE'S CONTENT
+
+Before writing a single title, confirm what is specific to THIS episode:
+1. What is the most surprising/contrarian/specific claim made in this episode?
+2. What would you text a friend right now to make them drop everything and listen?
+
+CRITICAL: Your titles must be about THIS episode — not about AI, not about YouTube, not about any topic illustrated in the examples above. The examples show FORMAT ONLY. Their topics (Harvard study, cholesterol, surgeons, etc.) have nothing to do with your episode unless your transcript literally covers those things.
+
+Self-check: Could this title apply to a different podcast episode on a different topic? If yes, throw it away. Every title must contain at least one element unique to this episode: a specific claim, number, quote fragment, or hot take pulled from the research and transcript you received.
 
 ### Step 1: Identify the top 3 hot takes from the research data
 The research intelligence includes a "hotTakes" array — these are the guest's

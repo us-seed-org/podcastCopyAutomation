@@ -250,8 +250,17 @@ export async function POST(request: Request) {
             message: `Generating titles with ${models.length} models in parallel (${models.map((m) => m.name).join(", ")})...`,
           });
 
+          const hotTakes: Array<{ quote: string; topic: string; whyClickable: string }> =
+            researchObj?.transcript?.hotTakes || [];
+
           const results = await Promise.allSettled(
-            models.map((m) => generateWithModel(m, systemPrompt, userPrompt))
+            models.map((m, idx) => {
+              const assignedHotTake = hotTakes[idx % Math.max(hotTakes.length, 1)];
+              const angleInstruction = assignedHotTake
+                ? `\n\n## YOUR ANCHOR HOT TAKE\nYour STRONGEST YouTube title must be built from this specific claim from the transcript:\n"${assignedHotTake.quote}"\nTopic: ${assignedHotTake.topic}\nOther titles may use different angles from the episode, but this claim is your primary hook.`
+                : "";
+              return generateWithModel(m, systemPrompt, userPrompt + angleInstruction);
+            })
           );
 
           // Merge successful results
