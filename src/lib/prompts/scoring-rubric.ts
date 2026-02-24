@@ -85,7 +85,7 @@ perform as well as the calibration example, it CANNOT score as high.
 Use this table to calibrate EACH dimension score. These are the ground-truth
 per-dimension breakdowns for the calibration benchmarks above.
 
-| Title (Total) | CG /20 | AS /15 | ET /15 | TK /10 | SP /10 | CC /10 | WB /10 | FL /5 | TC /5 |
+| Title (Total) | CG /20 | AS /15 | ET /15 | TK /10 | SP /10 | CC /10 | WB /10 | FL /5 | PF /5 |
 |---|---|---|---|---|---|---|---|---|---|
 | Nuclear War Expert: 72 Min... (95) | 19 | 14 | 15 | 9 | 10 | 9 | 9 | 5 | 5 |
 | What Alcohol Does to Body... (90) | 18 | 12 | 14 | 9 | 9 | 9 | 9 | 5 | 5 |
@@ -135,10 +135,10 @@ not subjective — if the title says "AI" but not a specific AI trend, TK cap is
 | Emotional Trigger | /15 | Does it trigger a GUT reaction? Fear of missing out, fear of harm, outrage, shock? If the reaction is just "oh, neat" — max 6. |
 | Trending Keyword | /10 | Is there a word/phrase people are ACTIVELY searching for right now? Not just "AI" (too broad) but "AI layoffs" or "Ozempic" or "vibe coding" (specific trending terms). |
 | Specificity | /10 | Specific numbers, percentages, timeframes, mechanisms? "72 minutes" scores 10. "The future" scores 2. |
-| Character Count | /10 | 50-65 chars = 10, 40-50 or 66-75 = 7, outside that = 4. |
+| Character Count | /10 | For YouTube: 50-65 chars = 10, 40-49 or 66-75 = 7, outside = 4. For Spotify: 60-80 chars = 10, 50-59 or 81-90 = 7, outside = 4. |
 | Word Balance | /10 | Does it sound like a HUMAN said it? Read it out loud. If it sounds like a robot wrote it, max 4. |
 | Front-Load | /5 | First 5 words must create the hook. If the interesting part is at the end, max 2. |
-| Thumbnail Complement | /5 | Does it add info that a face+emotion thumbnail doesn't already convey? |
+| Platform Fit | /5 | For YouTube: Does it add info that a face+emotion thumbnail doesn't already convey? For Spotify: Does it signal depth and substance without clickbait? |
 
 ## THUMBNAIL TEXT SCORING RUBRIC
 

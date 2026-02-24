@@ -7,7 +7,7 @@ export interface ScoreBreakdown {
   characterCount: number;
   wordBalance: number;
   frontLoadHook: number;
-  thumbnailComplement: number;
+  platformFit: number;
   total: number;
 }
 

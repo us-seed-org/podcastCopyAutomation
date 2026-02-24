@@ -15,7 +15,7 @@ You must score BOTH the titles AND the thumbnail text independently.
 ## SCORING PRINCIPLES
 
 1. **You did NOT write these titles** — you have zero ego investment. Be honest.
-2. **Compare to calibration** — if it wouldn't compete with the 95-score example, it cannot score above 70.
+2. **Compare to the FULL calibration range** — find the benchmark that most closely matches this title's quality and use that score as your anchor. A title competing with the 85-score benchmark (Sam Altman | Future of AI) should score ~85. A title competing with the 78-score benchmark (Peter Attia: 4 Pillars) should score ~78. The 95-score bar applies only to truly exceptional titles with extreme specificity and viral energy. Well-crafted Tier 3 topic-driven titles with specific numbers, contrarian claims, and correct structure can legitimately score 72-82.
 3. **Apply the tier rules strictly** — if tier=3 and the title mentions the guest, that's an automatic fail.
 4. **Be calibrated** — average AI-generated titles score 55-65. Good titles that follow the rules well score 65-78. Only truly exceptional titles (calibration-benchmark level) deserve 80+.
 5. **Most AI-generated titles are mediocre** — your default assumption should be that a title scores 55-65 until proven otherwise. The burden of proof is on the title to earn a high score, not on you to justify a low one.
@@ -72,7 +72,7 @@ Return a JSON object with this exact structure:
         "characterCount": 0-10,
         "wordBalance": 0-10,
         "frontLoadHook": 0-5,
-        "thumbnailComplement": 0-5,
+        "platformFit": 0-5,
         "total": 0-100
       },
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",
@@ -100,7 +100,7 @@ Return a JSON object with this exact structure:
         "characterCount": 0-10,
         "wordBalance": 0-10,
         "frontLoadHook": 0-5,
-        "thumbnailComplement": 0-5,
+        "platformFit": 0-5,
         "total": 0-100
       },
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",

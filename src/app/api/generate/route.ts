@@ -43,7 +43,7 @@ interface ScoreBreakdown {
   characterCount: number;
   wordBalance: number;
   frontLoadHook: number;
-  thumbnailComplement: number;
+  platformFit: number;
   total: number;
 }
 
@@ -256,8 +256,12 @@ export async function POST(request: Request) {
           const results = await Promise.allSettled(
             models.map((m, idx) => {
               const assignedHotTake = hotTakes[idx % Math.max(hotTakes.length, 1)];
-              const angleInstruction = assignedHotTake
-                ? `\n\n## YOUR ANCHOR HOT TAKE\nYour STRONGEST YouTube title must be built from this specific claim from the transcript:\n"${assignedHotTake.quote}"\nTopic: ${assignedHotTake.topic}\nOther titles may use different angles from the episode, but this claim is your primary hook.`
+              const quote = assignedHotTake?.quote ?? "";
+              const topic = assignedHotTake?.topic ?? "";
+              const cleanQuote = quote.replace(/[\r\n#*_`~]+/g, " ").substring(0, 300).trim();
+              const cleanTopic = topic.replace(/[\r\n#*_`~]+/g, " ").substring(0, 100).trim();
+              const angleInstruction = (cleanQuote || cleanTopic)
+                ? `\n\n## YOUR ANCHOR HOT TAKE\nThis is the most clickable moment from this episode. Build at least one YouTube title around it:\n"${cleanQuote}"\nTopic: ${cleanTopic}\n\nTo turn this into a great title: isolate the single most SPECIFIC element — a number, a timeframe, a name, a contrarian implication — and distill it to under 60 characters. Do NOT echo the quote verbatim. Find the sharpest form of the claim that would make someone stop scrolling.`
                 : "";
               return generateWithModel(m, systemPrompt, userPrompt + angleInstruction);
             })
@@ -569,7 +573,7 @@ export async function POST(request: Request) {
             const weakYTIndices = (generated.youtubeTitles || [])
               .map((t: any, i: number) =>
                 (t.score?.total || 0) < REWRITE_THRESHOLD ||
-                (t.thumbnailTextScore?.total || 0) < REWRITE_THRESHOLD
+                  (t.thumbnailTextScore?.total || 0) < REWRITE_THRESHOLD
                   ? i
                   : -1
               )

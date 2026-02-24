@@ -9,7 +9,7 @@ export const scoreBreakdownSchema = z.object({
   characterCount: z.number().min(0).max(10),
   wordBalance: z.number().min(0).max(10),
   frontLoadHook: z.number().min(0).max(5),
-  thumbnailComplement: z.number().min(0).max(5),
+  platformFit: z.number().min(0).max(5),
   total: z.number().min(0).max(100),
 });
 

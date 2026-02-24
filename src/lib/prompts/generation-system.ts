@@ -179,12 +179,11 @@ These work because the authority label itself creates intrigue:
 These work because the TOPIC is the hook, not the person.
 STATEMENTS are almost always better than questions:
 
-- "This Surgeon Won't Operate on Fridays. Here's the Science." (specific counterintuitive habit + curiosity gap)
-- "108K Jobs Cut in January. AI Isn't Slowing Down." (stat + punchy period-separated conclusion)
+- "OpenAI Has 18 Months to Win or Lose the AI Race. Here's What Happens Either Way." (specific timeframe + stakes)
 - "Harvard Tracked 1,000 People for 80 Years. This Was the #1 Predictor." (specific study + universal stakes)
+- "She Lost $400K Following Advice She Read Online. Here's What Actually Works." (personal stakes + lesson)
 - "Your Doctor Is Wrong About Cholesterol. The Science Changed." (contrarian + curiosity gap)
-- "Your Doctor Might Be Wrong About Ozempic" (challenges authority + universal relevance)
-- "She Lost $400K Following Advice on the Internet. Here's What Actually Works." (personal stakes + cautionary specificity)
+- "108K Jobs Cut in January. AI Isn't Slowing Down." (stat + punchy period-separated conclusion)
 
 Notice the PATTERN in great Tier 3 titles:
 - Short sentences. Often two, separated by a period.
@@ -348,10 +347,10 @@ For Tier 1/2 guests (name has value):
 - "Andrew Huberman: The Real Science Behind Cold Plunges"
 
 For Tier 3 guests (name has no pull — LEAD WITH TOPIC):
+- "The 18-Month Window That Will Determine Who Controls AI | EP 229"
 - "The 80-Year Harvard Study Just Changed What We Know About Happiness | EP 229"
 - "Why Your Doctor's Cholesterol Advice May Be 20 Years Out of Date | EP 229"
-- "The Friday Rule. Why Top Surgeons Refuse to Operate on Fridays."
-- "Inside the Study That Tracked 1,000 People for a Lifetime. What They Found."
+- "She Lost $400K. Then She Found What Finance Books Don't Tell You."
 
 Key Spotify principle: ONE clear angle per title, not a topic dump.
 The listener is committing 1-2 hours. Sell them ONE compelling reason, not a menu.
@@ -405,13 +404,14 @@ You MUST follow this exact process. Record your work in the JSON output fields.
 
 ### STEP ZERO: ANCHOR TO THIS EPISODE'S CONTENT
 
-Before writing a single title, confirm what is specific to THIS episode:
-1. What is the most surprising/contrarian/specific claim made in this episode?
-2. What would you text a friend right now to make them drop everything and listen?
+Before writing a single title, create a pre-writing checklist with these three items:
+1. What is the most surprising/contrarian/specific claim made in this episode? (e.g., what does the guest argue that most people currently believe is wrong?)
+2. What would you text a friend right now to make them drop everything and listen? (e.g., what claim made here would make someone say "wait, WHAT?!" if texted to them?)
+3. What are three extractable specific facts (exact number, timeframe, stat, or name) from this episode that could anchor a title?
 
-CRITICAL: Your titles must be about THIS episode — not about AI, not about YouTube, not about any topic illustrated in the examples above. The examples show FORMAT ONLY. Their topics (Harvard study, cholesterol, surgeons, etc.) have nothing to do with your episode unless your transcript literally covers those things.
+CRITICAL: Every title must contain at least one specific element from the research and transcript: a statistic, timeframe, company name, contrarian claim, or quote fragment. The examples above show STRUCTURE and ENERGY only — their topics (surgeons, Harvard, cholesterol) are irrelevant to your episode. Use the same structural energy, but derive 100% of your content from the research intelligence and transcript you received.
 
-Self-check: Could this title apply to a different podcast episode on a different topic? If yes, throw it away. Every title must contain at least one element unique to this episode: a specific claim, number, quote fragment, or hot take pulled from the research and transcript you received.
+Self-check: Could this title be published for a different episode on a different topic? If yes, it is too generic. Throw it away and extract a more specific angle from the research.
 
 ### Step 1: Identify the top 3 hot takes from the research data
 The research intelligence includes a "hotTakes" array — these are the guest's
@@ -479,7 +479,7 @@ Return a JSON object with this exact structure:
         "characterCount": 0-10,
         "wordBalance": 0-10,
         "frontLoadHook": 0-5,
-        "thumbnailComplement": 0-5,
+        "platformFit": 0-5,
         "total": 0-100
       },
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",

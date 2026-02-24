@@ -15,7 +15,7 @@ const dimensions: { key: keyof Omit<ScoreBreakdown, "total">; label: string; max
   { key: "characterCount", label: "Character Count", max: 10 },
   { key: "wordBalance", label: "Word Balance", max: 10 },
   { key: "frontLoadHook", label: "Front-Load Hook", max: 5 },
-  { key: "thumbnailComplement", label: "Thumbnail Complement", max: 5 },
+  { key: "platformFit", label: "Platform Fit", max: 5 },
 ];
 
 function getBarColor(value: number, max: number): string {
