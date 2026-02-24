@@ -418,12 +418,12 @@ Self-check: Could this title be published for a different episode on a different
 ### Step 1: Identify your anchor angles
 Determine if this episode is primarily a playbook/guide or a discussion:
 - If Playbook/Guide (especially for Tier 3 guests): Identify the CORE PREMISE or most valuable takeaway. This is your primary anchor.
-- If Discussion: Identify the top 3 hot takes from the research data. These are the guest's most contrarian, shocking, provocative, or prediction-making moments. Rank by clickability. Ask for each one: "If I texted this to a friend, would they immediately want to hear the episode?" Pick the top 3. (If no hotTakes exist, fall back to the most SURPRISING or CONTRARIAN topClaims).
+- If Discussion: Identify the top 4 hot takes from the research data. These are the guest's most contrarian, shocking, provocative, or prediction-making moments. Rank by clickability. Ask for each one: "If I texted this to a friend, would they immediately want to hear the episode?" Pick the top 4. (If no hotTakes exist, fall back to the most SURPRISING or CONTRARIAN topClaims).
 
-### Step 2: Write 10 raw title attempts ANCHORED IN YOUR ANGLES (store in rejectedTitles field)
-Write 10 raw title ideas based on the anchor angles identified in Step 1.
-- If Playbook/Guide: Write 10 attempts anchored in the specific value, framework, or core premise of the episode.
-- If Discussion: For each of your top 3 hot takes, write 3 title angles. Then write 1 wildcard.
+### Step 2: Write 12 raw title attempts ANCHORED IN YOUR ANGLES (store in rejectedTitles field)
+Write 12 raw title ideas based on the anchor angles identified in Step 1.
+- If Playbook/Guide: Write 12 attempts anchored in the specific value, framework, or core premise of the episode.
+- If Discussion: For each of your 4 hot takes, write 3 title angles.
 Write them like you're texting a friend about what the guest said or what you learned:
 - "bro this doctor said cardio is actually making people fatter"
 - "the exact 9-slide playbook you need to prepare your startup for AI 2027"
@@ -441,7 +441,7 @@ Cross out any that:
 Record rejected titles with reasons in the rejectedTitles JSON field.
 
 ### Step 4: Polish the survivors
-Take the 3-4 surviving ideas and craft them into proper titles.
+Take EXACTLY 4 surviving ideas and craft them into proper, final titles.
 This means:
 - Testing different word orders (front-load the hook)
 - Trying with and without numbers
@@ -493,7 +493,9 @@ Return a JSON object with this exact structure:
         "total": 0-100
       }
     },
-    { ... second YouTube title with its own thumbnailText ... }
+    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} },
+    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} },
+    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} }
   ],
   "spotifyTitles": [
     {
@@ -518,7 +520,8 @@ NOTE: Do NOT generate descriptions or chapters. Focus ALL creativity on titles +
 - Return ONLY the JSON object. No other text.
 - The "total" score MUST equal the sum of all individual dimension scores (for both title scores AND thumbnail text scores).
 - Score every title honestly against the calibration benchmarks and per-dimension table. An independent evaluator will verify. Inflated self-scores will be caught and the title will be sent back for rewriting anyway.
-- YouTube titles and Spotify titles should use DIFFERENT angles for variety.
+- YouTube titles and Spotify titles should use DIFFERENT angles for variety. 
+- You MUST generate EXACTLY 4 HIGHLY DISTINCT YouTube titles. Each of the 4 YouTube titles MUST take a completely different angle, use different wording, and target different emotional triggers. DO NOT generate two titles that say the same thing with slightly different synonyms.
 - Each YouTube title MUST include a thumbnailText and thumbnailTextScore. Spotify titles do NOT get thumbnailText.
 - The thumbnailText must NEVER repeat words or phrases from its paired title. They are two halves of one hook.
 - Include at least 3 rejected titles in rejectedTitles to show your work.
@@ -552,7 +555,7 @@ Now generate optimized TITLES + THUMBNAIL TEXT. Remember:
 - Apply the Scroll Test and Group Chat Test to every title
 - Check every title against the AI Slop banned list
 - Score honestly against calibration benchmarks — an independent evaluator will verify all scores
-- YouTube titles: 50-70 chars, NO em dashes, sounds like a human said it
+- Generate EXACTLY 4 HIGHLY DISTINCT YouTube titles: 50-70 chars, NO em dashes, sounds like a human said it. They MUST have zero angle or phrasing overlap (derived from the 4 distinct angles).
 - Each YouTube title MUST include thumbnailText (2-5 words, ALL CAPS) that COMPLEMENTS the title — never repeats it
 - Spotify titles: 60-80 chars, magazine-headline energy, NO thumbnailText needed
 - Include your rejected titles with reasons in the rejectedTitles field

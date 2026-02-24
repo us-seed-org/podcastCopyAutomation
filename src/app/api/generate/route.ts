@@ -27,7 +27,7 @@ function areSameAngle(a: string, b: string): boolean {
   const kA = new Set(extractKeyNouns(a));
   const kB = extractKeyNouns(b);
   const overlap = kB.filter(k => kA.has(k)).length;
-  return overlap >= 2;
+  return overlap >= 3;
 }
 
 function normalizeTitle(title: string): string {
@@ -171,17 +171,19 @@ async function generateWithModel(
         prompt: userPrompt,
       });
       const jsonStr = extractFirstJson(fallback.text);
-      if (!jsonStr) return null;
+      if (!jsonStr) {
+        throw new Error(`[PASS 1] fallback extraction failed for ${config.name} - No JSON found. Output snippet: ${fallback.text.slice(0, 500)}`);
+      }
       const parsed = JSON.parse(jsonStr);
       const validated = titleGenerationOutputSchema.safeParse(parsed);
       if (!validated.success) {
-        console.warn("Fallback validation failed:", validated.error);
-        return null;
+        throw new Error(`[PASS 1] Fallback validation failed for ${config.name}: ${validated.error.message}. Raw parsed: ${JSON.stringify(parsed).slice(0, 500)}`);
       }
       return validated.data;
     } catch (err2) {
-      console.warn(`[PASS 1] generateText also failed for ${config.name}:`, err2);
-      return null;
+      const msg1 = err instanceof Error ? err.message : String(err);
+      const msg2 = err2 instanceof Error ? err2.message : String(err2);
+      throw new Error(`[PASS 1] Both standard and fallback generation failed for ${config.name}. Standard err: ${msg1}. Fallback err: ${msg2}`);
     }
   }
 }
@@ -238,8 +240,8 @@ export async function POST(request: Request) {
           });
 
           const models: GenerationModelConfig[] = [
-            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "GPT-5.2" },
-            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro (B)" : "GPT-5.2 (B)" },
+            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
+            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro (B)" : "Gemini 3.0 Flash (B)" },
             { model: minimaxGenerationModel, name: "Minimax M2.5" },
             ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
           ];
@@ -278,8 +280,12 @@ export async function POST(request: Request) {
               }
               allRejectedTitles.push(...(gen.rejectedTitles || []));
             } else {
-              const reason = result.status === "rejected" ? result.reason : "returned null";
-              console.warn(`[PASS 1] ${modelName} failed:`, reason);
+              const reason = result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "returned null";
+              console.warn(`[PASS 1] ${modelName} failed. Reason:`, reason);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: `[WARNING] ${modelName} failed: ${reason}`
+              });
             }
           });
 
@@ -297,11 +303,11 @@ export async function POST(request: Request) {
             message: `${succeededModels.length}/${models.length} models succeeded (${succeededModels.join(", ")}). Got ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles.`,
           });
 
-          // Semantic deduplication: keep max 2 titles per angle cluster before scoring
+          // Semantic deduplication: keep max 1 title per angle cluster before scoring
           const dedupedYoutube: typeof allYoutubeTitles = [];
           for (const candidate of allYoutubeTitles) {
             const sameAngleCount = dedupedYoutube.filter(t => areSameAngle(t.title, candidate.title)).length;
-            if (sameAngleCount < 2) dedupedYoutube.push(candidate);
+            if (sameAngleCount === 0) dedupedYoutube.push(candidate);
           }
           if (dedupedYoutube.length < allYoutubeTitles.length) {
             sendSSE(controller, encoder, {
@@ -657,16 +663,26 @@ ${weakSP.length > 0 ? `Generate ${weakSP.length} NEW Spotify ${weakSP.length ===
 Return the same JSON structure. Score honestly against the calibration benchmarks.`;
 
             let rewritten: any = null;
-            const rewriteModelName = geminiGenerationModel ? "Gemini 3.1 Pro (rewrite)" : "GPT-5.2 (rewrite)";
-            const rewriteGenResult = await generateWithModel(
-              { model: geminiGenerationModel ?? generationModel, name: rewriteModelName },
-              systemPrompt,
-              rewriteInput
-            );
-            if (rewriteGenResult) {
-              rewritten = rewriteGenResult;
-            } else {
-              console.warn(`[PASS 3] Rewrite attempt ${attempt} failed`);
+            const rewriteModelName = geminiGenerationModel ? "Gemini 3.1 Pro (rewrite)" : "Gemini 3.0 Flash (rewrite)";
+            try {
+              const rewriteGenResult = await generateWithModel(
+                { model: geminiGenerationModel ?? generationModel, name: rewriteModelName },
+                systemPrompt,
+                rewriteInput
+              );
+              if (rewriteGenResult) {
+                rewritten = rewriteGenResult;
+              } else {
+                console.warn(`[PASS 3] Rewrite attempt ${attempt} failed`);
+                continue;
+              }
+            } catch (err) {
+              const reason = err instanceof Error ? err.message : String(err);
+              console.warn(`[PASS 3] Rewrite attempt ${attempt} failed with error:`, reason);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: `[WARNING] ${rewriteModelName} failed rewrite attempt ${attempt}: ${reason}`
+              });
               continue;
             }
 
