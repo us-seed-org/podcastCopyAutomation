@@ -152,9 +152,10 @@ The guest is NOT a household name, but they have a credential/authority label th
 
 ### Tier 3 — No Name Recognition AND No Strong Label → TOPIC-DRIVEN (DEFAULT for most episodes)
 The guest has zero name recognition AND their authority label references an organization or role that general audiences won't recognize or care about. This is the MOST COMMON scenario.
-- Rule: DROP the guest entirely from the YouTube title. Build the title around the strongest HOT TAKES from the transcript — contrarian claims, shocking stats, bold predictions, or provocative opinions.
-- The title should be anchored in the single most clickable hot take from the conversation, not a keyword salad
-- Think of it like a news headline — nobody cares WHO said it, they care about WHAT was said
+- Rule: DROP the guest entirely from the YouTube title. Build the title around the CORE PREMISE of the episode OR the strongest HOT TAKES from the transcript.
+- If the episode is a highly valuable playbook, guide, or breakdown (e.g., "9 Slides to Prepare for AI"), anchor the title in that core value.
+- If the episode is mostly discussion, anchor it in the single most clickable hot take or contrarian claim.
+- Think of it like a news headline or a masterclass — nobody cares WHO said it, they care about WHAT they will learn or WHAT was said.
 
 ### How to decide the tier:
 1. Ask: "Would the average person scrolling YouTube recognize this name?" → If yes: Tier 1
@@ -404,32 +405,30 @@ You MUST follow this exact process. Record your work in the JSON output fields.
 
 ### STEP ZERO: ANCHOR TO THIS EPISODE'S CONTENT
 
-Before writing a single title, create a pre-writing checklist with these three items:
-1. What is the most surprising/contrarian/specific claim made in this episode? (e.g., what does the guest argue that most people currently believe is wrong?)
-2. What would you text a friend right now to make them drop everything and listen? (e.g., what claim made here would make someone say "wait, WHAT?!" if texted to them?)
-3. What are three extractable specific facts (exact number, timeframe, stat, or name) from this episode that could anchor a title?
+Before writing a single title, create a pre-writing checklist with these four items:
+1. What is the core premise or most valuable takeaway of the entire episode? (e.g., a "Solve Everything" playbook)
+2. What is the most surprising/contrarian/specific claim made in this episode? (e.g., what does the guest argue that most people currently believe is wrong?)
+3. What would you text a friend right now to make them drop everything and listen? 
+4. What are three extractable specific facts (exact number, timeframe, stat, or name) from this episode that could anchor a title?
 
-CRITICAL: Every title must contain at least one specific element from the research and transcript: a statistic, timeframe, company name, contrarian claim, or quote fragment. The examples above show STRUCTURE and ENERGY only — their topics (surgeons, Harvard, cholesterol) are irrelevant to your episode. Use the same structural energy, but derive 100% of your content from the research intelligence and transcript you received.
+CRITICAL: Every title must contain at least one specific element from the research and transcript: the core episode framework (a named system/method/model/product or distinct concept, explicitly named or quoted), a statistic, timeframe, company name, contrarian claim, or quote fragment. The examples above show STRUCTURE and ENERGY only — their topics (surgeons, Harvard, cholesterol) are irrelevant to your episode. Use the same structural energy, but derive 100% of your content from the research intelligence and transcript you received.
 
 Self-check: Could this title be published for a different episode on a different topic? If yes, it is too generic. Throw it away and extract a more specific angle from the research.
 
-### Step 1: Identify the top 3 hot takes from the research data
-The research intelligence includes a "hotTakes" array — these are the guest's
-most contrarian, shocking, provocative, or prediction-making moments. Read all
-of them and rank by clickability. Ask for each one: "If I texted this to a
-friend, would they immediately want to hear the episode?" Pick the top 3.
+### Step 1: Identify your anchor angles
+Determine if this episode is primarily a playbook/guide or a discussion:
+- If Playbook/Guide (especially for Tier 3 guests): Identify the CORE PREMISE or most valuable takeaway. This is your primary anchor.
+- If Discussion: Identify the top 3 hot takes from the research data. These are the guest's most contrarian, shocking, provocative, or prediction-making moments. Rank by clickability. Ask for each one: "If I texted this to a friend, would they immediately want to hear the episode?" Pick the top 3. (If no hotTakes exist, fall back to the most SURPRISING or CONTRARIAN topClaims).
 
-If the research has no hotTakes, fall back to the topClaims and look for the
-most SURPRISING or CONTRARIAN claims. A hot take is always better than a
-trending keyword for driving clicks.
-
-### Step 2: Write 10 raw title attempts ANCHORED IN HOT TAKES (store in rejectedTitles field)
-For each of your top 3 hot takes, write 3 title angles. Then write 1 wildcard.
-Write them like you're texting a friend about what the guest said:
+### Step 2: Write 10 raw title attempts ANCHORED IN YOUR ANGLES (store in rejectedTitles field)
+Write 10 raw title ideas based on the anchor angles identified in Step 1.
+- If Playbook/Guide: Write 10 attempts anchored in the specific value, framework, or core premise of the episode.
+- If Discussion: For each of your top 3 hot takes, write 3 title angles. Then write 1 wildcard.
+Write them like you're texting a friend about what the guest said or what you learned:
 - "bro this doctor said cardio is actually making people fatter"
+- "the exact 9-slide playbook you need to prepare your startup for AI 2027"
 - "apparently 80% of CEOs could be replaced by AI by 2030"
 - "he literally called college the biggest scam in America"
-- "this guy thinks everything your doctor told you about cholesterol is wrong"
 
 ### Step 3: Kill the weak ones
 Cross out any that:

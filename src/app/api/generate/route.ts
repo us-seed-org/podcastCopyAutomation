@@ -95,7 +95,7 @@ interface ScoredTitle {
 
 interface GenerationResult {
   youtubeTitles: YouTubeTitleItem[];
-  spotifyTitles: SpotifyTitleItem[];
+  spotifyTitles: BaseTitleItem[];
   rejectedTitles: ScoredTitle[];
 }
 
@@ -103,7 +103,6 @@ const REWRITE_THRESHOLD = 70;
 const MAX_REWRITE_ATTEMPTS = 3;
 const TARGET_YOUTUBE_COUNT = 4;
 const TARGET_SPOTIFY_COUNT = 2;
-const REWRITE_MODEL_NAME = "GPT-5.2 (rewrite)";
 const PAIRWISE_TOP_N = 6;
 
 function sendSSE(
@@ -254,22 +253,14 @@ export async function POST(request: Request) {
             researchObj?.transcript?.hotTakes || [];
 
           const results = await Promise.allSettled(
-            models.map((m, idx) => {
-              const assignedHotTake = hotTakes[idx % Math.max(hotTakes.length, 1)];
-              const quote = assignedHotTake?.quote ?? "";
-              const topic = assignedHotTake?.topic ?? "";
-              const cleanQuote = quote.replace(/[\r\n#*_`~]+/g, " ").substring(0, 300).trim();
-              const cleanTopic = topic.replace(/[\r\n#*_`~]+/g, " ").substring(0, 100).trim();
-              const angleInstruction = (cleanQuote || cleanTopic)
-                ? `\n\n## YOUR ANCHOR HOT TAKE\nThis is the most clickable moment from this episode. Build at least one YouTube title around it:\n"${cleanQuote}"\nTopic: ${cleanTopic}\n\nTo turn this into a great title: isolate the single most SPECIFIC element — a number, a timeframe, a name, a contrarian implication — and distill it to under 60 characters. Do NOT echo the quote verbatim. Find the sharpest form of the claim that would make someone stop scrolling.`
-                : "";
-              return generateWithModel(m, systemPrompt, userPrompt + angleInstruction);
+            models.map((m) => {
+              return generateWithModel(m, systemPrompt, userPrompt);
             })
           );
 
           // Merge successful results
-          let allYoutubeTitles: YoutubeTitle[] = [];
-          let allSpotifyTitles: SpotifyTitleItem[] = [];
+          let allYoutubeTitles: YouTubeTitleItem[] = [];
+          let allSpotifyTitles: BaseTitleItem[] = [];
           let allRejectedTitles: ScoredTitle[] = [];
           const succeededModels: string[] = [];
 
@@ -666,15 +657,15 @@ ${weakSP.length > 0 ? `Generate ${weakSP.length} NEW Spotify ${weakSP.length ===
 Return the same JSON structure. Score honestly against the calibration benchmarks.`;
 
             let rewritten: any = null;
-            try {
-              const rewriteResult = await generateObject({
-                model: generationModel,
-                schema: titleGenerationOutputSchema,
-                system: systemPrompt,
-                prompt: rewriteInput,
-              });
-              rewritten = rewriteResult.object;
-            } catch {
+            const rewriteModelName = geminiGenerationModel ? "Gemini 3.1 Pro (rewrite)" : "GPT-5.2 (rewrite)";
+            const rewriteGenResult = await generateWithModel(
+              { model: geminiGenerationModel ?? generationModel, name: rewriteModelName },
+              systemPrompt,
+              rewriteInput
+            );
+            if (rewriteGenResult) {
+              rewritten = rewriteGenResult;
+            } else {
               console.warn(`[PASS 3] Rewrite attempt ${attempt} failed`);
               continue;
             }
@@ -735,7 +726,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                     rewriteScored?.youtubeTitles?.[ri]?.thumbnailTextScore ||
                     rewrittenItem.thumbnailTextScore ||
                     generated.youtubeTitles[originalIndex].thumbnailTextScore,
-                  sourceModel: REWRITE_MODEL_NAME,
+                  sourceModel: rewriteModelName,
                   rewritten: true,
                 };
               }
@@ -754,7 +745,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                     rewriteScored?.spotifyTitles?.[ri]?.score ||
                     rewrittenItem.score ||
                     generated.spotifyTitles[originalIndex].score,
-                  sourceModel: REWRITE_MODEL_NAME,
+                  sourceModel: rewriteModelName,
                   rewritten: true,
                 };
               }
