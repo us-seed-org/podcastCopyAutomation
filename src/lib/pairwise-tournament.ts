@@ -21,10 +21,41 @@ interface TournamentResult {
   consistentPairs: number;
 }
 
+/** Run tasks with bounded concurrency. */
+async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const idx = nextIndex++;
+      try {
+        results[idx] = { status: "fulfilled", value: await tasks[idx]() };
+      } catch (err) {
+        results[idx] = { status: "rejected", reason: err };
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, tasks.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+const PAIRWISE_CONCURRENCY = 5;
+const PAIRWISE_CALL_TIMEOUT_MS = 30_000;
+
 export async function runPairwiseTournament(
   youtubeTitles: TitleWithScore[],
   episodeDescription: string,
-  topN: number = 6
+  topN: number = 5,
+  onProgress?: (completed: number, total: number) => void
 ): Promise<TournamentResult | null> {
   const judgeModel = pairwiseJudgeModel;
   if (!judgeModel) {
@@ -70,8 +101,12 @@ export async function runPairwiseTournament(
     });
   }
 
-  const results = await Promise.allSettled(
-    comparisons.map(async (comp) => {
+  let completedCount = 0;
+
+  const tasks = comparisons.map((comp) => async (): Promise<PairComparisonResult> => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PAIRWISE_CALL_TIMEOUT_MS);
       try {
         const result = await generateObject({
           model: judgeModel,
@@ -84,14 +119,25 @@ export async function runPairwiseTournament(
             titleB: comp.titleB.title,
             thumbnailTextB: comp.titleB.thumbnailText,
           }),
+          abortSignal: controller.signal,
         });
         return { ...comp, winner: result.object.winner };
-      } catch (err) {
-        console.warn("[Pairwise] Comparison failed:", err);
-        return { ...comp, winner: null };
+      } finally {
+        clearTimeout(timeout);
+        completedCount++;
+        try {
+          onProgress?.(completedCount, comparisons.length);
+        } catch (progressErr) {
+          console.error("[Pairwise] onProgress callback error:", progressErr);
+        }
       }
-    })
-  );
+    } catch (err) {
+      console.warn("[Pairwise] Comparison failed:", err instanceof Error ? err.message : err);
+      return { ...comp, winner: null };
+    }
+  });
+
+  const results = await runWithConcurrency(tasks, PAIRWISE_CONCURRENCY);
 
   const typedResults = results as PromiseSettledResult<PairComparisonResult>[];
 

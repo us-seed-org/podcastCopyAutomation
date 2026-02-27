@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { guestName, podcastName, episodeDescription, transcript, coHosts, targetAudience } = body;
 
-    if (!guestName || !podcastName || !episodeDescription || !transcript) {
+    if (!podcastName || !episodeDescription || !transcript) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       "host-only",
       "solo episode",
     ];
-    const hasNoGuest = noGuestPatterns.some((pattern) =>
+    const hasNoGuest = !guestName || guestName.trim() === "" || noGuestPatterns.some((pattern) =>
       guestName.toLowerCase().includes(pattern)
     );
 
@@ -105,7 +105,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
 
           const noGuestResearch = {
             guest: {
-              name: guestName,
+              name: hasNoGuest ? "N/A - Solo Episode" : (guestName.trim() || "N/A - Solo Episode"),
               bio: "This episode has no external guest. Content is driven by hosts' discussion and transcript topics.",
               credentials: [],
               socialPresence: "N/A - no external guest",
@@ -165,7 +165,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
 
     const systemPrompt = buildResearchSystemPrompt();
     const userPrompt = buildResearchUserPrompt({
-      guestName,
+      guestName: guestName || "N/A - Solo Episode",
       podcastName,
       episodeDescription,
       transcript,

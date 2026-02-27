@@ -1,6 +1,3 @@
-// Disabled — description/chapter generation is currently on ice.
-// Kept for future re-enablement.
-
 import { z } from "zod";
 
 const chapterTitleSchema = z.object({

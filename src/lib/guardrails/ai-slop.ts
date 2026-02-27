@@ -67,6 +67,61 @@ export function checkAiSlop(texts: string[]): GuardrailResult {
   return { passed: violations.length === 0, violations };
 }
 
+export function checkChapterTitles(chapterTitles: string[]): GuardrailResult {
+  const violations: string[] = [];
+
+  for (const title of chapterTitles) {
+    // Ban em dashes
+    if (/\u2014/.test(title)) {
+      violations.push(`Chapter "${title}" contains em dash`);
+    }
+    // Ban en dashes
+    if (/\u2013/.test(title)) {
+      violations.push(`Chapter "${title}" contains en dash`);
+    }
+    // Ban semicolons
+    if (/;/.test(title)) {
+      violations.push(`Chapter "${title}" contains semicolon`);
+    }
+    // Ban arrow characters
+    if (/[\u2192\u279C\u2794]/.test(title)) {
+      violations.push(`Chapter "${title}" contains arrow character`);
+    }
+    // Ban parenthetical annotations
+    if (/\(.*\)/.test(title)) {
+      violations.push(`Chapter "${title}" contains parenthetical annotation`);
+    }
+    // Ban meta-references like "9 chapters of X"
+    if (/\d+\s*chapters?\s*of/i.test(title)) {
+      violations.push(`Chapter "${title}" contains meta-reference`);
+    }
+    // Ban vague labels
+    const vaguePatterns = [
+      /^discussion about/i,
+      /^wrap\s*[+&]/i,
+      /^intro\s*[&+]/i,
+      /^closing thoughts/i,
+      /^final thoughts/i,
+      /^overview of/i,
+    ];
+    for (const pattern of vaguePatterns) {
+      if (pattern.test(title)) {
+        violations.push(`Chapter "${title}" is a vague label, not a hook`);
+        break;
+      }
+    }
+    // Character count check (30-60 target, allow some flex)
+    if (title.length > 60) {
+      violations.push(`Chapter "${title}" is ${title.length} chars (max 60)`);
+    }
+    if (title.length < 10) {
+      violations.push(`Chapter "${title}" is only ${title.length} chars (too short to be a hook)`);
+    }
+  }
+
+  return { passed: violations.length === 0, violations };
+}
+
 export function checkThumbnailText(
   thumbnailTexts: Array<{ thumbnailText: string; title: string }>
 ): GuardrailResult {

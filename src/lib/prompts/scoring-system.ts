@@ -25,7 +25,7 @@ You must score BOTH the titles AND the thumbnail text independently.
 
 1. **Thumbnail text must complement the title, NEVER repeat it.** If any significant word from the title appears in the thumbnail text, titleComplement maxes at 5.
 2. **2-5 words only.** 6+ words = brevityAndClarity score of 0.
-3. **Must trigger a gut reaction.** If the emotional response is merely "interesting," emotionalPunch maxes at 10.
+3. **Must trigger a gut reaction or intellectual intrigue.** If the emotional response is merely "interesting," emotionalPunch maxes at 10. (Exception: Conceptual reframes score high on intellectual intrigue).
 4. **Score against the thumbnail text calibration benchmarks** in the rubric below.
 
 ## MANDATORY SCORING PROCESS (follow for EACH title)
@@ -125,6 +125,8 @@ NOTE: YouTube titles include thumbnailText and thumbnailTextScore. Spotify title
 - YouTube titles MUST include thumbnailText and thumbnailTextScore. Spotify titles must NOT.
 - If thumbnail text repeats significant words from the title, thumbnailTextScore.titleComplement max 5.
 - If thumbnail text is 6+ words, thumbnailTextScore.brevityAndClarity = 0.
+- **HALLUCINATION CHECK**: If a title mentions a specific person, statistic, paper, or organization that does NOT appear in the provided research intelligence or transcript, cap the title score at a maximum of 25. If the thumbnail text (separately) mentions a hallucinated entity, cap thumbnailTextScore at a maximum of 20. Apply each cap independently to the offending artifact. This is the most critical rule — invented content destroys channel credibility.
+- **GENERIC THUMBNAIL TEXT**: If thumbnail text is a context-free mystery phrase (e.g., "WAIT UNTIL YOU HEAR", "HE'S LETTING GO", "YOU WON'T BELIEVE", "THE TRUTH", "IT'S HAPPENING") OR a metric-style pattern (e.g., "108K GONE", "$100M THRESHOLD", "ABUNDANCE 2035") that could appear on any YouTube video regardless of topic, cap thumbnailTextScore.emotionalPunch at 8 and thumbnailTextScore.curiosityGap at 8. Exception: Conceptual reframes that distill the episode's specific thesis into a proprietary phrase (e.g., "PAIN IS THE NEW MOAT", "TASTE > TECH") are NOT context-free mystery phrases — they are episode-specific insights and should be scored on their conceptual merit.
 - Return ONLY the JSON object. No other text.`;
 }
 
@@ -163,9 +165,10 @@ Apply the tier classification strictly:
 
 THUMBNAIL TEXT scoring:
 - Score each YouTube title's thumbnailText against the thumbnail text calibration benchmarks
+- The thumbnail text should be an emotional verdict/reaction OR a conceptual reframe (a proprietary phrase distilling the episode's unique thesis, like "PAIN IS THE NEW MOAT") — NOT a raw data snippet, NOT a vague mystery phrase
+- Cover the title and read only the thumbnail text. Does it (a) trigger an immediate gut reaction in plain English and sound like something a person would say, OR (b) distill the episode's core thesis into a proprietary conceptual phrase that makes you think "wait, what does that mean?" (e.g., "PAIN IS THE NEW MOAT")? If it sounds like a metric (e.g., "108K GONE", "$100M THRESHOLD", "ABUNDANCE 2035") or a context-free mystery phrase ("WAIT UNTIL YOU HEAR", "IT'S HAPPENING"), cap emotionalPunch at 8 and curiosityGap at 8. Conceptual reframes that are episode-specific should NOT be capped.
 - Check: does it repeat words from the title? If so, titleComplement max 5
-- Check: is it 2-5 words? 6+ words = brevityAndClarity 0
-- Check: does it trigger an immediate visceral gut reaction (shock, fear, outrage, excitement)? Could you picture a face showing that emotion next to these words? If the reaction is merely "interesting," emotionalPunch maxes at 10.
+- Check: is it 3-5 words? 6+ words = brevityAndClarity 0
 - YouTube titles include thumbnailText + thumbnailTextScore. Spotify titles do NOT.
 
 Return ONLY the JSON object with scores, thumbnail text scores, and tier verification.`;

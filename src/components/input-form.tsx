@@ -33,7 +33,6 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
     const newErrors: Record<string, string> = {};
 
     if (!transcript) newErrors.transcript = "Transcript is required";
-    if (!guestName.trim()) newErrors.guestName = "Guest name is required";
     if (!podcastName.trim()) newErrors.podcastName = "Podcast name is required";
     if (!episodeDescription.trim() || episodeDescription.trim().length < 10)
       newErrors.episodeDescription = "Please provide at least a brief description (10+ characters)";
@@ -50,7 +49,7 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
     onSubmit({
       transcript: truncateTranscript(transcript.text),
       transcriptTimestamps: transcript.hasTimestamps,
-      guestName: guestName.trim(),
+      guestName: guestName.trim() || undefined,
       podcastName: podcastName.trim(),
       episodeDescription: episodeDescription.trim(),
       coHosts: coHosts.trim() || undefined,
@@ -92,10 +91,10 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="guestName">Guest Name *</Label>
+              <Label htmlFor="guestName">Guest Name (Optional)</Label>
               <Input
                 id="guestName"
-                placeholder="e.g., Andrew Huberman"
+                placeholder="e.g., Andrew Huberman (Leave blank for solo episodes)"
                 value={guestName}
                 onChange={(e) => {
                   setGuestName(e.target.value);

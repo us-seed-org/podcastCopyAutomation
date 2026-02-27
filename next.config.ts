@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["ai", "@ai-sdk/openai", "@ai-sdk/google", "@ai-sdk/openai-compatible"],
 };
 
 export default nextConfig;

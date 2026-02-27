@@ -1,0 +1,214 @@
+{
+  "generated": [
+    {
+      "title": "Most AI Agents Fail. Start With Zero Autonomy Instead",
+      "score": {
+        "curiosityGap": 15,
+        "authoritySignal": 5,
+        "emotionalTrigger": 11,
+        "trendingKeyword": 6,
+        "specificity": 4,
+        "characterCount": 10,
+        "wordBalance": 9,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 70
+      },
+      "scrollStopReason": "Zero autonomy is backwards",
+      "emotionalTrigger": "Fear of failure",
+      "platformNotes": "Contrarian, punchy, and instantly relevant to anyone building agents; strong first sentence then clear prescription.",
+      "thumbnailText": "START BACKWARDS",
+      "thumbnailTextScore": {
+        "curiosityGap": 21,
+        "emotionalPunch": 16,
+        "titleComplement": 25,
+        "brevityAndClarity": 25,
+        "total": 87
+      }
+    },
+    {
+      "title": "CCCD: The Only Reliable Way to Ship AI Like CI/CD",
+      "score": {
+        "curiosityGap": 14,
+        "authoritySignal": 5,
+        "emotionalTrigger": 7,
+        "trendingKeyword": 7,
+        "specificity": 6,
+        "characterCount": 10,
+        "wordBalance": 8,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 67
+      },
+      "scrollStopReason": "AI has a shipping system",
+      "emotionalTrigger": "Relief",
+      "platformNotes": "Framework naming (CCCD) + familiar analogy (CI/CD) makes it feel like a practical engineering playbook, not AI hype.",
+      "thumbnailText": "SHIP TRUST",
+      "thumbnailTextScore": {
+        "curiosityGap": 18,
+        "emotionalPunch": 12,
+        "titleComplement": 25,
+        "brevityAndClarity": 25,
+        "total": 80
+      }
+    },
+    {
+      "title": "Pain Is the New Moat. LLMs Are Already Commoditized",
+      "score": {
+        "curiosityGap": 15,
+        "authoritySignal": 5,
+        "emotionalTrigger": 10,
+        "trendingKeyword": 6,
+        "specificity": 4,
+        "characterCount": 10,
+        "wordBalance": 9,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 69
+      },
+      "scrollStopReason": "Moat flips everything",
+      "emotionalTrigger": "Contrarian intrigue",
+      "platformNotes": "Strong thesis statement with a memorable reframe; pairs well with a conceptual thumbnail and founder/PM audience.",
+      "thumbnailText": "PAIN IS MOAT",
+      "thumbnailTextScore": {
+        "curiosityGap": 22,
+        "emotionalPunch": 18,
+        "titleComplement": 25,
+        "brevityAndClarity": 25,
+        "total": 90
+      }
+    },
+    {
+      "title": "RAG Breaks on 300-Page Docs. It's Not a Token Problem",
+      "score": {
+        "curiosityGap": 17,
+        "authoritySignal": 5,
+        "emotionalTrigger": 10,
+        "trendingKeyword": 8,
+        "specificity": 8,
+        "characterCount": 10,
+        "wordBalance": 8,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 76
+      },
+      "scrollStopReason": "RAG failing has a cause",
+      "emotionalTrigger": "Alarm",
+      "platformNotes": "Specific failure mode (300-page docs) plus a contrarian diagnosis creates a strong engineering curiosity loop.",
+      "thumbnailText": "CONTEXT COLLAPSE",
+      "thumbnailTextScore": {
+        "curiosityGap": 23,
+        "emotionalPunch": 16,
+        "titleComplement": 25,
+        "brevityAndClarity": 23,
+        "total": 87
+      }
+    }
+  ],
+  "scored": [
+    {
+      "title": "Most AI Agents Fail. Start With Zero Autonomy Instead",
+      "score": {
+        "curiosityGap": 12,
+        "authoritySignal": 3,
+        "emotionalTrigger": 9,
+        "trendingKeyword": 5,
+        "specificity": 4,
+        "characterCount": 10,
+        "wordBalance": 8,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 61
+      },
+      "scrollStopReason": "Contrarian build advice",
+      "emotionalTrigger": "Fear of failure",
+      "platformNotes": "Nearest benchmark: 65 (\"Future of AI...not ready\" style) leaning toward 70 in energy but lacks numbers/mechanism. Also resembles 70-level generic claim/prescription; no extra specificity to earn >70.",
+      "thumbnailText": "START BACKWARDS",
+      "thumbnailTextScore": {
+        "curiosityGap": 17,
+        "emotionalPunch": 10,
+        "titleComplement": 25,
+        "brevityAndClarity": 25,
+        "total": 77
+      }
+    },
+    {
+      "title": "CCCD: The Only Reliable Way to Ship AI Like CI/CD",
+      "score": {
+        "curiosityGap": 12,
+        "authoritySignal": 3,
+        "emotionalTrigger": 8,
+        "trendingKeyword": 5,
+        "specificity": 4,
+        "characterCount": 10,
+        "wordBalance": 6,
+        "frontLoadHook": 4,
+        "platformFit": 4,
+        "total": 56
+      },
+      "scrollStopReason": "New framework promise",
+      "emotionalTrigger": "Relief",
+      "platformNotes": "Nearest benchmark: 55 (\"Interest Rates, Inflation &...\"). \"Only reliable way\" + acronym naming feels like coined-jargon marketing; still no concrete proof/metric. Low-benchmark resemblance to 55 AI/panel energy caps this at ≤63 anyway.",
+      "thumbnailText": "SHIP TRUST",
+      "thumbnailTextScore": {
+        "curiosityGap": 14,
+        "emotionalPunch": 10,
+        "titleComplement": 25,
+        "brevityAndClarity": 25,
+        "total": 74
+      }
+    },
+    {
+      "title": "Pain Is the New Moat. LLMs Are Already Commoditized",
+      "score": {
+        "curiosityGap": 14,
+        "authoritySignal": 3,
+        "emotionalTrigger": 9,
+        "trendingKeyword": 5,
+        "specificity": 4,
+        "characterCount": 10,
+        "wordBalance": 8,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 63
+      },
+      "scrollStopReason": "Big contrarian thesis",
+      "emotionalTrigger": "Contrarian intrigue",
+      "platformNotes": "Nearest benchmark: 70 in vibe (strong reframe), but lacks the universal relevance/mechanism of 78+ and has no concrete support. Also shares \"LinkedIn contrarian\" energy (65-ish) so it doesn’t earn 70+ without specifics.",
+      "thumbnailText": "PAIN IS MOAT",
+      "thumbnailTextScore": {
+        "curiosityGap": 20,
+        "emotionalPunch": 18,
+        "titleComplement": 5,
+        "brevityAndClarity": 23,
+        "total": 66
+      }
+    },
+    {
+      "title": "RAG Breaks on 300-Page Docs. It's Not a Token Problem",
+      "score": {
+        "curiosityGap": 15,
+        "authoritySignal": 4,
+        "emotionalTrigger": 9,
+        "trendingKeyword": 8,
+        "specificity": 8,
+        "characterCount": 10,
+        "wordBalance": 8,
+        "frontLoadHook": 5,
+        "platformFit": 5,
+        "total": 72
+      },
+      "scrollStopReason": "Specific RAG failure",
+      "emotionalTrigger": "Alarm",
+      "platformNotes": "Nearest benchmark: 70 (\"Why Everyone Is Talking...\") but this is materially more specific (300-page docs) with a clear contrarian diagnosis. Doesn’t reach 78 because audience is narrower and claim still lacks a named mechanism beyond negating tokens.",
+      "thumbnailText": "CONTEXT COLLAPSE",
+      "thumbnailTextScore": {
+        "curiosityGap": 19,
+        "emotionalPunch": 14,
+        "titleComplement": 25,
+        "brevityAndClarity": 23,
+        "total": 81
+      }
+    }
+  ]
+}

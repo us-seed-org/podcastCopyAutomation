@@ -19,7 +19,7 @@ export interface PipelineState {
 export interface FormInput {
   transcript: string;
   transcriptTimestamps: boolean;
-  guestName: string;
+  guestName?: string;
   podcastName: string;
   episodeDescription: string;
   coHosts?: string;

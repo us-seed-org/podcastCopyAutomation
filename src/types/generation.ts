@@ -45,9 +45,36 @@ export interface TierClassification {
   verification: string;
 }
 
+export interface ChapterTitle {
+  timestamp: string;
+  title: string;
+}
+
+export interface DescriptionScore {
+  hookQuality: number;
+  structuralMatch: number;
+  seoIntegration: number;
+  humanVoice: number;
+  total: number;
+}
+
+export interface ChapterScore {
+  specificityAvg: number;
+  activeVoice: number;
+  noBannedPatterns: number;
+  miniHookQuality: number;
+  total: number;
+}
+
 export interface GenerationOutput {
   youtubeTitles: TitleOption[];
   spotifyTitles: TitleOption[];
   rejectedTitles: RejectedTitle[];
   tierClassification?: TierClassification;
+  youtubeDescription?: string;
+  spotifyDescription?: string;
+  chapters?: ChapterTitle[];
+  descriptionSEOKeywords?: string[];
+  descriptionScore?: DescriptionScore;
+  chapterScore?: ChapterScore;
 }

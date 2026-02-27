@@ -1,5 +1,5 @@
 import { generateObject, generateText } from "ai";
-import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, pairwiseJudgeModel, geminiGenerationModel } from "@/lib/ai";
+import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, geminiScoringModel, pairwiseJudgeModel, geminiGenerationModel, descriptionModel } from "@/lib/ai";
 import {
   buildGenerationSystemPrompt,
   buildGenerationUserPrompt,
@@ -8,12 +8,17 @@ import {
   buildScoringSystemPrompt,
   buildScoringUserPrompt,
 } from "@/lib/prompts/scoring-system";
+import {
+  buildDescriptionChapterSystemPrompt,
+  buildDescriptionChapterUserPrompt,
+} from "@/lib/prompts/description-chapter-system";
 import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
 import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
-import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema } from "@/lib/schemas/generation-output";
-import { checkAiSlop, checkThumbnailText } from "@/lib/guardrails/ai-slop";
+import { descriptionChapterOutputSchema } from "@/lib/schemas/description-chapter-output";
+import { checkAiSlop, checkThumbnailText, checkChapterTitles } from "@/lib/guardrails/ai-slop";
 import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
 import { runPairwiseTournament } from "@/lib/pairwise-tournament";
+import { supabase } from "@/lib/supabase";
 
 export const maxDuration = 300;
 
@@ -71,23 +76,6 @@ interface YouTubeTitleItem extends BaseTitleItem {
   pairwiseRank?: number;
 }
 
-interface YoutubeTitle {
-  title: string;
-  thumbnailText?: string;
-  thumbnailTextScore?: ThumbnailTextScore;
-  score?: ScoreBreakdown;
-  scrollStopReason?: string;
-  emotionalTrigger?: string;
-  platformNotes?: string;
-  sourceModel?: string;
-  pairwiseWins?: number;
-  pairwiseRank?: number;
-}
-
-interface SpotifyTitleItem extends BaseTitleItem {
-  // Spotify titles don't have thumbnail fields
-}
-
 interface ScoredTitle {
   title: string;
   rejectionReason: string;
@@ -103,7 +91,7 @@ const REWRITE_THRESHOLD = 70;
 const MAX_REWRITE_ATTEMPTS = 3;
 const TARGET_YOUTUBE_COUNT = 4;
 const TARGET_SPOTIFY_COUNT = 2;
-const PAIRWISE_TOP_N = 6;
+const PAIRWISE_TOP_N = 5;
 
 function sendSSE(
   controller: ReadableStreamDefaultController,
@@ -117,16 +105,25 @@ function getAllTitleTexts(titles: { title: string }[]): string[] {
   return titles.map((t) => t.title);
 }
 
+/**
+ * Strip <think>...</think> blocks that some models (e.g. Minimax) prepend.
+ */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
 function extractFirstJson(text: string): string | null {
-  const start = text.indexOf("{");
+  // Strip thinking tags and markdown code fences before extraction
+  const cleaned = stripThinkTags(text);
+  const start = cleaned.indexOf("{");
   if (start === -1) return null;
   let depth = 0;
   let inString = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
     if (inString) {
       if (ch === "\\") {
-        i++; // skip escaped character
+        i++;
       } else if (ch === '"') {
         inString = false;
       }
@@ -137,7 +134,7 @@ function extractFirstJson(text: string): string | null {
         depth++;
       } else if (ch === "}") {
         depth--;
-        if (depth === 0) return text.slice(start, i + 1);
+        if (depth === 0) return cleaned.slice(start, i + 1);
       }
     }
   }
@@ -149,42 +146,323 @@ interface GenerationModelConfig {
   name: string;
 }
 
+const GENERATION_CALL_TIMEOUT_MS = 60_000;
+
+/**
+ * Check if an error is transient (rate limit, temporary outage) and worth retrying.
+ */
+function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return msg.includes("429") || msg.includes("rate limit") ||
+    msg.includes("not found") || msg.includes("404") ||
+    msg.includes("503") || msg.includes("service unavailable") ||
+    msg.includes("timeout") || msg.includes("aborted") ||
+    msg.includes("econnreset") || msg.includes("socket hang up");
+}
+
 async function generateWithModel(
   config: GenerationModelConfig,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  retries = 2
 ): Promise<GenerationResult | null> {
-  try {
-    const result = await generateObject({
-      model: config.model,
-      schema: titleGenerationOutputSchema,
-      system: systemPrompt,
-      prompt: userPrompt,
-    });
-    return result.object as GenerationResult;
-  } catch (err) {
-    console.warn(`[PASS 1] generateObject failed for ${config.name}, falling back to generateText:`, err);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+      console.log(`[PASS 1] Retrying ${config.name} (attempt ${attempt + 1}/${retries + 1}) after ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GENERATION_CALL_TIMEOUT_MS);
     try {
-      const fallback = await generateText({
+      const result = await generateObject({
         model: config.model,
+        schema: titleGenerationOutputSchema,
         system: systemPrompt,
         prompt: userPrompt,
+        abortSignal: controller.signal,
       });
-      const jsonStr = extractFirstJson(fallback.text);
-      if (!jsonStr) {
-        throw new Error(`[PASS 1] fallback extraction failed for ${config.name} - No JSON found. Output snippet: ${fallback.text.slice(0, 500)}`);
+      return result.object as GenerationResult;
+    } catch (err) {
+      console.warn(`[PASS 1] generateObject failed for ${config.name} (attempt ${attempt + 1}):`,
+        err instanceof Error ? err.message : err);
+
+      // Try generateText fallback (handles models that return <think> tags or non-structured output)
+      try {
+        const fallbackController = new AbortController();
+        const fallbackTimeout = setTimeout(() => fallbackController.abort(), GENERATION_CALL_TIMEOUT_MS);
+        const fallback = await generateText({
+          model: config.model,
+          system: systemPrompt,
+          prompt: userPrompt,
+          abortSignal: fallbackController.signal,
+        });
+        clearTimeout(fallbackTimeout);
+        const jsonStr = extractFirstJson(fallback.text);
+        if (!jsonStr) {
+          throw new Error(`[PASS 1] fallback extraction failed for ${config.name} - No JSON found. Output snippet: ${fallback.text.slice(0, 500)}`);
+        }
+        const parsed = JSON.parse(jsonStr);
+        const validated = titleGenerationOutputSchema.safeParse(parsed);
+        if (!validated.success) {
+          throw new Error(`[PASS 1] Fallback validation failed for ${config.name}: ${validated.error.message}. Raw parsed: ${JSON.stringify(parsed).slice(0, 500)}`);
+        }
+        return validated.data;
+      } catch (err2) {
+        const msg1 = err instanceof Error ? err.message : String(err);
+        const msg2 = err2 instanceof Error ? err2.message : String(err2);
+
+        // Retry on transient errors, throw on final attempt
+        if (attempt < retries && (isTransientError(err) || isTransientError(err2))) {
+          console.warn(`[PASS 1] Transient error for ${config.name}, will retry: ${msg1}`);
+          continue;
+        }
+        throw new Error(`[PASS 1] Both standard and fallback generation failed for ${config.name}. Standard err: ${msg1}. Fallback err: ${msg2}`);
       }
-      const parsed = JSON.parse(jsonStr);
-      const validated = titleGenerationOutputSchema.safeParse(parsed);
-      if (!validated.success) {
-        throw new Error(`[PASS 1] Fallback validation failed for ${config.name}: ${validated.error.message}. Raw parsed: ${JSON.stringify(parsed).slice(0, 500)}`);
-      }
-      return validated.data;
-    } catch (err2) {
-      const msg1 = err instanceof Error ? err.message : String(err);
-      const msg2 = err2 instanceof Error ? err2.message : String(err2);
-      throw new Error(`[PASS 1] Both standard and fallback generation failed for ${config.name}. Standard err: ${msg1}. Fallback err: ${msg2}`);
+    } finally {
+      clearTimeout(timeout);
     }
+  }
+  return null;
+}
+
+// Dual-scorer panel: scores with both GPT-5.2 and Gemini, returns mean of dimension scores
+async function scoreWithPanel(
+  titlesToScore: { youtubeTitles: any[]; spotifyTitles: any[] },
+  research: string,
+  scoringPrompt: string
+): Promise<any> {
+  const scoringInput = buildScoringUserPrompt({
+    generatedTitles: JSON.stringify(titlesToScore, null, 2),
+    research,
+  });
+
+  const scorers: Array<{ model: any; name: string }> = [
+    { model: scoringModel, name: "GPT-5.2" },
+  ];
+  if (geminiScoringModel) {
+    scorers.push({ model: geminiScoringModel, name: "Gemini 3.1 Pro" });
+  }
+
+  const SCORING_CALL_TIMEOUT_MS = 45_000;
+
+  const results = await Promise.allSettled(
+    scorers.map((s) => {
+      const ctrl = new AbortController();
+      const tm = setTimeout(() => ctrl.abort(), SCORING_CALL_TIMEOUT_MS);
+      return generateObject({
+        model: s.model,
+        schema: scoringOutputSchema,
+        system: scoringPrompt,
+        prompt: scoringInput,
+        abortSignal: ctrl.signal,
+      }).finally(() => clearTimeout(tm));
+    })
+  );
+
+  const successfulScores: any[] = [];
+  results.forEach((result, idx) => {
+    if (result.status === "fulfilled") {
+      successfulScores.push({ scores: result.value.object, name: scorers[idx].name });
+    } else {
+      console.warn(`[SCORING PANEL] ${scorers[idx].name} failed:`, result.reason);
+    }
+  });
+
+  if (successfulScores.length === 0) return null;
+  if (successfulScores.length === 1) return successfulScores[0].scores;
+
+  // Merge: average dimension scores across both scorers
+  return mergeScores(successfulScores.map((s) => s.scores));
+}
+
+function averageDimensionScores(scores: any[]): any {
+  if (scores.length === 0) return null;
+  if (scores.length === 1) return scores[0];
+
+  const result: any = {};
+  const keys = Object.keys(scores[0]);
+  for (const key of keys) {
+    if (typeof scores[0][key] === "number") {
+      const avg = scores.reduce((sum: number, s: any) => sum + (s[key] || 0), 0) / scores.length;
+      result[key] = Math.round(avg);
+    }
+  }
+  // Recalculate total as sum of dimensions
+  const dimensionKeys = keys.filter((k) => k !== "total" && typeof scores[0][k] === "number");
+  result.total = dimensionKeys.reduce((sum: number, k: string) => sum + (result[k] || 0), 0);
+  return result;
+}
+
+function mergeScores(allScores: any[]): any {
+  if (allScores.length === 0) return null;
+  if (allScores.length === 1) return allScores[0];
+
+  const merged: any = { tierClassification: allScores[0].tierClassification };
+
+  // Merge YouTube titles
+  const ytCount = Math.max(...allScores.map((s) => s.youtubeTitles?.length || 0));
+  merged.youtubeTitles = [];
+  for (let i = 0; i < ytCount; i++) {
+    const titlesAtIdx = allScores
+      .map((s) => s.youtubeTitles?.[i])
+      .filter(Boolean);
+    if (titlesAtIdx.length === 0) continue;
+
+    const base = { ...titlesAtIdx[0] };
+    const dimensionScores = titlesAtIdx.map((t: any) => t.score).filter(Boolean);
+    if (dimensionScores.length > 0) {
+      base.score = averageDimensionScores(dimensionScores);
+    }
+    const thumbScores = titlesAtIdx.map((t: any) => t.thumbnailTextScore).filter(Boolean);
+    if (thumbScores.length > 0) {
+      base.thumbnailTextScore = averageDimensionScores(thumbScores);
+    }
+    merged.youtubeTitles.push(base);
+  }
+
+  // Merge Spotify titles
+  const spCount = Math.max(...allScores.map((s) => s.spotifyTitles?.length || 0));
+  merged.spotifyTitles = [];
+  for (let i = 0; i < spCount; i++) {
+    const titlesAtIdx = allScores
+      .map((s) => s.spotifyTitles?.[i])
+      .filter(Boolean);
+    if (titlesAtIdx.length === 0) continue;
+
+    const base = { ...titlesAtIdx[0] };
+    const dimensionScores = titlesAtIdx.map((t: any) => t.score).filter(Boolean);
+    if (dimensionScores.length > 0) {
+      base.score = averageDimensionScores(dimensionScores);
+    }
+    merged.spotifyTitles.push(base);
+  }
+
+  return merged;
+}
+
+// Database logging helpers
+async function insertGenerationRun(data: {
+  podcastName: string;
+  guestName: string;
+  episodeDescription: string;
+  guestTier: number;
+  transcriptCharCount: number;
+  modelsUsed: string[];
+  scoringModel: string;
+  pairwiseEnabled: boolean;
+}): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data: row, error } = await supabase
+      .from("generation_runs")
+      .insert({
+        podcast_name: data.podcastName,
+        guest_name: data.guestName,
+        episode_description: data.episodeDescription,
+        guest_tier: data.guestTier,
+        transcript_char_count: data.transcriptCharCount,
+        models_used: data.modelsUsed,
+        scoring_model: data.scoringModel,
+        pairwise_enabled: data.pairwiseEnabled,
+        status: "running",
+      })
+      .select("id")
+      .single();
+    if (error) {
+      console.warn("[DB] Failed to insert generation_run:", error.message);
+      return null;
+    }
+    return row?.id || null;
+  } catch (err) {
+    console.warn("[DB] Error inserting generation_run:", err);
+    return null;
+  }
+}
+
+async function updateGenerationRun(
+  runId: string | null,
+  data: { status: string; totalCandidatesGenerated?: number; runDurationMs?: number }
+): Promise<void> {
+  if (!supabase || !runId) return;
+  try {
+    await supabase.from("generation_runs").update({
+      status: data.status,
+      total_candidates_generated: data.totalCandidatesGenerated,
+      run_duration_ms: data.runDurationMs,
+    }).eq("id", runId);
+  } catch (err) {
+    console.warn("[DB] Error updating generation_run:", err);
+  }
+}
+
+async function insertTitleResults(
+  runId: string,
+  titles: any[],
+  platform: "youtube" | "spotify",
+  wasSelected: boolean
+): Promise<void> {
+  if (!supabase || !runId) return;
+  try {
+    const rows = titles.map((t: any) => ({
+      run_id: runId,
+      platform,
+      title: t.title,
+      thumbnail_text: t.thumbnailText || null,
+      source_model: t.sourceModel || "unknown",
+      score_total: t.score?.total || null,
+      score_curiosity_gap: t.score?.curiosityGap || null,
+      score_authority_signal: t.score?.authoritySignal || null,
+      score_emotional_trigger: t.score?.emotionalTrigger || null,
+      score_trending_keyword: t.score?.trendingKeyword || null,
+      score_specificity: t.score?.specificity || null,
+      score_character_count: t.score?.characterCount || null,
+      score_word_balance: t.score?.wordBalance || null,
+      score_front_load: t.score?.frontLoadHook || null,
+      score_platform_fit: t.score?.platformFit || null,
+      thumb_score_total: t.thumbnailTextScore?.total || null,
+      thumb_curiosity_gap: t.thumbnailTextScore?.curiosityGap || null,
+      thumb_emotional_punch: t.thumbnailTextScore?.emotionalPunch || null,
+      thumb_title_complement: t.thumbnailTextScore?.titleComplement || null,
+      thumb_brevity_clarity: t.thumbnailTextScore?.brevityAndClarity || null,
+      pairwise_wins: t.pairwiseWins || null,
+      pairwise_rank: t.pairwiseRank || null,
+      was_selected: wasSelected,
+      was_rewritten: t.rewritten || false,
+      rejection_reason: t.rejectionReason || null,
+    }));
+    const { error } = await supabase.from("title_results").insert(rows);
+    if (error) console.warn("[DB] Failed to insert title_results:", error.message);
+  } catch (err) {
+    console.warn("[DB] Error inserting title_results:", err);
+  }
+}
+
+async function insertModelPerformance(
+  runId: string,
+  modelStats: Map<string, { generated: number; selected: number; totalScore: number; totalThumbScore: number; timeMs: number; hadErrors: boolean; errorMsg?: string }>
+): Promise<void> {
+  if (!supabase || !runId) return;
+  try {
+    const rows = Array.from(modelStats.entries()).map(([name, stats]) => ({
+      run_id: runId,
+      model_name: name,
+      titles_generated: stats.generated,
+      titles_selected: stats.selected,
+      avg_score: stats.generated > 0 ? Math.round((stats.totalScore / stats.generated) * 100) / 100 : null,
+      avg_thumb_score: stats.generated > 0 && stats.totalThumbScore > 0
+        ? Math.round((stats.totalThumbScore / stats.generated) * 100) / 100
+        : null,
+      generation_time_ms: stats.timeMs,
+      had_errors: stats.hadErrors,
+      error_message: stats.errorMsg || null,
+    }));
+    const { error } = await supabase.from("model_performance").insert(rows);
+    if (error) console.warn("[DB] Failed to insert model_performance:", error.message);
+  } catch (err) {
+    console.warn("[DB] Error inserting model_performance:", err);
   }
 }
 
@@ -203,6 +481,9 @@ export async function POST(request: Request) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        const runStartTime = Date.now();
+        let runId: string | null = null;
+
         try {
           const researchStr =
             typeof research === "string"
@@ -229,6 +510,26 @@ export async function POST(request: Request) {
           const guestTier = researchObj?.guest?.guestTier?.tier || 3;
           const guestCredential =
             researchObj?.guest?.authorityLabel || undefined;
+          const podcastName = researchObj?.brand?.podcastName || "Unknown Podcast";
+
+          // === DB: Insert generation run ===
+          const models: GenerationModelConfig[] = [
+            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
+            { model: generationModel, name: "GPT-5.2" },
+            { model: minimaxGenerationModel, name: "Minimax M2.5" },
+            ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
+          ];
+
+          runId = await insertGenerationRun({
+            podcastName,
+            guestName: guestName || "(no guest)",
+            episodeDescription,
+            guestTier,
+            transcriptCharCount: transcript.length,
+            modelsUsed: models.map((m) => m.name),
+            scoringModel: geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2",
+            pairwiseEnabled: !!pairwiseJudgeModel,
+          });
 
           // === PASS 1: Multi-model parallel generation ===
           const systemPrompt = buildGenerationSystemPrompt();
@@ -239,24 +540,20 @@ export async function POST(request: Request) {
             episodeDescription,
           });
 
-          const models: GenerationModelConfig[] = [
-            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
-            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro (B)" : "Gemini 3.0 Flash (B)" },
-            { model: minimaxGenerationModel, name: "Minimax M2.5" },
-            ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
-          ];
-
           sendSSE(controller, encoder, {
             type: "status",
             message: `Generating titles with ${models.length} models in parallel (${models.map((m) => m.name).join(", ")})...`,
           });
 
-          const hotTakes: Array<{ quote: string; topic: string; whyClickable: string }> =
-            researchObj?.transcript?.hotTakes || [];
+          const modelTimings = new Map<string, number>();
+          const modelStartTimes = new Map<string, number>();
+          for (const m of models) modelStartTimes.set(m.name, Date.now());
 
           const results = await Promise.allSettled(
-            models.map((m) => {
-              return generateWithModel(m, systemPrompt, userPrompt);
+            models.map(async (m) => {
+              const result = await generateWithModel(m, systemPrompt, userPrompt);
+              modelTimings.set(m.name, Date.now() - (modelStartTimes.get(m.name) || Date.now()));
+              return result;
             })
           );
 
@@ -265,13 +562,18 @@ export async function POST(request: Request) {
           let allSpotifyTitles: BaseTitleItem[] = [];
           let allRejectedTitles: ScoredTitle[] = [];
           const succeededModels: string[] = [];
+          const modelStats = new Map<string, { generated: number; selected: number; totalScore: number; totalThumbScore: number; timeMs: number; hadErrors: boolean; errorMsg?: string }>();
 
           results.forEach((result, idx) => {
             const modelName = models[idx].name;
+            const timeMs = modelTimings.get(modelName) || 0;
+
             if (result.status === "fulfilled" && result.value) {
               succeededModels.push(modelName);
               const gen = result.value;
-              // Tag each title with its source model
+              const ytCount = gen.youtubeTitles?.length || 0;
+              const spCount = gen.spotifyTitles?.length || 0;
+
               for (const t of gen.youtubeTitles || []) {
                 allYoutubeTitles.push({ ...t, sourceModel: modelName });
               }
@@ -279,6 +581,15 @@ export async function POST(request: Request) {
                 allSpotifyTitles.push({ ...t, sourceModel: modelName });
               }
               allRejectedTitles.push(...(gen.rejectedTitles || []));
+
+              modelStats.set(modelName, {
+                generated: ytCount + spCount,
+                selected: 0,
+                totalScore: 0,
+                totalThumbScore: 0,
+                timeMs,
+                hadErrors: false,
+              });
             } else {
               const reason = result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "returned null";
               console.warn(`[PASS 1] ${modelName} failed. Reason:`, reason);
@@ -286,10 +597,20 @@ export async function POST(request: Request) {
                 type: "status",
                 message: `[WARNING] ${modelName} failed: ${reason}`
               });
+              modelStats.set(modelName, {
+                generated: 0,
+                selected: 0,
+                totalScore: 0,
+                totalThumbScore: 0,
+                timeMs,
+                hadErrors: true,
+                errorMsg: reason.slice(0, 500),
+              });
             }
           });
 
           if (allYoutubeTitles.length === 0) {
+            await updateGenerationRun(runId, { status: "error" });
             sendSSE(controller, encoder, {
               type: "error",
               message: "All generation models failed. No titles produced.",
@@ -303,7 +624,7 @@ export async function POST(request: Request) {
             message: `${succeededModels.length}/${models.length} models succeeded (${succeededModels.join(", ")}). Got ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles.`,
           });
 
-          // Semantic deduplication: keep max 1 title per angle cluster before scoring
+          // Semantic deduplication
           const dedupedYoutube: typeof allYoutubeTitles = [];
           for (const candidate of allYoutubeTitles) {
             const sameAngleCount = dedupedYoutube.filter(t => areSameAngle(t.title, candidate.title)).length;
@@ -317,7 +638,7 @@ export async function POST(request: Request) {
           }
           allYoutubeTitles = dedupedYoutube;
 
-          // Run guardrails on merged set — filter out violating titles instead of re-generating
+          // Guardrails
           const ytSlopCheck = checkAiSlop(getAllTitleTexts(allYoutubeTitles));
           const ytTierCheck = checkTierCompliance(
             guestName,
@@ -332,7 +653,6 @@ export async function POST(request: Request) {
             }))
           );
 
-          // If guardrail violations exist, log them but keep titles (scoring will penalize them)
           const allViolations = [
             ...ytSlopCheck.violations,
             ...ytTierCheck.violations,
@@ -345,16 +665,16 @@ export async function POST(request: Request) {
             });
           }
 
-          // Also check Spotify titles
           const spSlopCheck = checkAiSlop(getAllTitleTexts(allSpotifyTitles));
           if (!spSlopCheck.passed) {
             console.warn("[PASS 1] Spotify guardrail violations:", spSlopCheck.violations);
           }
 
-          // === PASS 2: Score all titles with Minimax M2.5 ===
+          // === PASS 2: Dual-scorer panel ===
+          const scorerNames = geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
           sendSSE(controller, encoder, {
             type: "status",
-            message: `Scoring ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles with independent evaluator...`,
+            message: `Scoring ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles with ${scorerNames}...`,
           });
 
           const scoringPrompt = buildScoringSystemPrompt();
@@ -377,29 +697,18 @@ export async function POST(request: Request) {
             })),
           };
 
-          const scoringInput = buildScoringUserPrompt({
-            generatedTitles: JSON.stringify(titlesToScore, null, 2),
-            research: researchStr,
-          });
-
           let scored: any = null;
           try {
-            const scoreResult = await generateObject({
-              model: scoringModel,
-              schema: scoringOutputSchema,
-              system: scoringPrompt,
-              prompt: scoringInput,
-            });
-            scored = scoreResult.object;
+            scored = await scoreWithPanel(titlesToScore, researchStr, scoringPrompt);
           } catch (err) {
-            console.warn("[PASS 2] Scoring failed:", err);
+            console.warn("[PASS 2] Scoring panel failed:", err);
             sendSSE(controller, encoder, {
               type: "status",
               message: "Scoring failed — continuing with self-assessed scores",
             });
           }
 
-          // Merge scores back onto titles using lookup map by normalized title
+          // Merge scores back onto titles
           if (scored) {
             const ytScoreLookup = new Map<string, any>();
             if (scored.youtubeTitles) {
@@ -450,7 +759,7 @@ export async function POST(request: Request) {
             }
           }
 
-          // === PASS 2.5: Pairwise Tournament (Gemini) ===
+          // === PASS 2.5: Pairwise Tournament ===
           if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
             sendSSE(controller, encoder, {
               type: "status",
@@ -467,7 +776,15 @@ export async function POST(request: Request) {
               const tournament = await runPairwiseTournament(
                 tournamentInput,
                 episodeDescription,
-                PAIRWISE_TOP_N
+                PAIRWISE_TOP_N,
+                (completed, total) => {
+                  if (completed % 5 === 0 || completed === total) {
+                    sendSSE(controller, encoder, {
+                      type: "status",
+                      message: `Pairwise tournament: ${completed}/${total} comparisons complete...`,
+                    });
+                  }
+                }
               );
 
               if (tournament) {
@@ -509,7 +826,7 @@ export async function POST(request: Request) {
             }
           }
 
-          // === Selection: Keep top titles by pairwise rank (or score if no tournament) ===
+          // === Selection ===
           const hasPairwiseData = allYoutubeTitles.some((t: any) => t.pairwiseRank !== undefined);
           allYoutubeTitles.sort((a: any, b: any) => {
             if (hasPairwiseData) {
@@ -528,7 +845,6 @@ export async function POST(request: Request) {
           const selectedYoutube = allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
           const selectedSpotify = allSpotifyTitles.slice(0, TARGET_SPOTIFY_COUNT);
 
-          // Add eliminated titles to rejected list
           const eliminatedYT = allYoutubeTitles.slice(TARGET_YOUTUBE_COUNT);
           const eliminatedSP = allSpotifyTitles.slice(TARGET_SPOTIFY_COUNT);
           for (const t of eliminatedYT) {
@@ -552,6 +868,23 @@ export async function POST(request: Request) {
             message: `Selected top ${selectedYoutube.length} YouTube + ${selectedSpotify.length} Spotify titles.`,
           });
 
+          // Update model stats with selection info
+          for (const t of selectedYoutube) {
+            const stats = modelStats.get(t.sourceModel || "");
+            if (stats) {
+              stats.selected++;
+              stats.totalScore += t.score?.total || 0;
+              stats.totalThumbScore += t.thumbnailTextScore?.total || 0;
+            }
+          }
+          for (const t of selectedSpotify) {
+            const stats = modelStats.get(t.sourceModel || "");
+            if (stats) {
+              stats.selected++;
+              stats.totalScore += t.score?.total || 0;
+            }
+          }
+
           // Build merged output
           const generated: any = {
             youtubeTitles: selectedYoutube,
@@ -560,13 +893,12 @@ export async function POST(request: Request) {
             tierClassification: scored?.tierClassification,
           };
 
-          // === PASS 3: Iterative rewrite loop (up to 3 attempts) ===
+          // === PASS 3: Iterative rewrite loop ===
           for (
             let attempt = 1;
             attempt <= MAX_REWRITE_ATTEMPTS;
             attempt++
           ) {
-            // A YouTube title is weak if either title score OR thumbnail text score is below threshold
             const weakYTIndices = (generated.youtubeTitles || [])
               .map((t: any, i: number) =>
                 (t.score?.total || 0) < REWRITE_THRESHOLD ||
@@ -686,7 +1018,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               continue;
             }
 
-            // Run guardrails on rewritten titles
+            // Guardrails on rewritten titles
             const rewriteSlopCheck = checkAiSlop(
               getAllTitleTexts(rewritten.youtubeTitles || []).concat(
                 getAllTitleTexts(rewritten.spotifyTitles || [])
@@ -706,24 +1038,33 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               );
             }
 
-            // Re-score rewritten titles
+            // Re-score rewritten titles with panel
             let rewriteScored: any = null;
             try {
-              const scoreResult = await generateObject({
-                model: scoringModel,
-                schema: scoringOutputSchema,
-                system: scoringPrompt,
-                prompt: buildScoringUserPrompt({
-                  generatedTitles: JSON.stringify(rewritten, null, 2),
-                  research: researchStr,
-                }),
-              });
-              rewriteScored = scoreResult.object;
+              const rewriteTitlesToScore = {
+                youtubeTitles: (rewritten.youtubeTitles || []).map((t: any) => ({
+                  title: t.title,
+                  thumbnailText: t.thumbnailText,
+                  score: t.score,
+                  thumbnailTextScore: t.thumbnailTextScore,
+                  scrollStopReason: t.scrollStopReason,
+                  emotionalTrigger: t.emotionalTrigger,
+                  platformNotes: t.platformNotes,
+                })),
+                spotifyTitles: (rewritten.spotifyTitles || []).map((t: any) => ({
+                  title: t.title,
+                  score: t.score,
+                  scrollStopReason: t.scrollStopReason,
+                  emotionalTrigger: t.emotionalTrigger,
+                  platformNotes: t.platformNotes,
+                })),
+              };
+              rewriteScored = await scoreWithPanel(rewriteTitlesToScore, researchStr, scoringPrompt);
             } catch {
               console.warn(`[PASS 3] Re-scoring attempt ${attempt} failed`);
             }
 
-            // Merge rewritten titles into generated, replacing weak ones
+            // Merge rewritten titles
             if (weakYTIndices.length > 0 && rewritten.youtubeTitles) {
               const ytReplacementCount = Math.min(
                 rewritten.youtubeTitles.length,
@@ -776,10 +1117,104 @@ Return the same JSON structure. Score honestly against the calibration benchmark
             ];
           }
 
+          // === PASS 4: Description & Chapter Generation ===
+          sendSSE(controller, encoder, {
+            type: "status",
+            message: "Generating descriptions and chapter titles...",
+          });
+
+          try {
+            const descriptionPattern = youtubeAnalysis?.descriptionPattern
+              ? typeof youtubeAnalysis.descriptionPattern === "string"
+                ? youtubeAnalysis.descriptionPattern
+                : JSON.stringify(youtubeAnalysis.descriptionPattern, null, 2)
+              : null;
+
+            const descSystemPrompt = buildDescriptionChapterSystemPrompt();
+            const descUserPrompt = buildDescriptionChapterUserPrompt({
+              research: researchStr,
+              descriptionPattern,
+              winningTitles: {
+                youtube: (generated.youtubeTitles || []).map((t: any) => t.title),
+                spotify: (generated.spotifyTitles || []).map((t: any) => t.title),
+              },
+              transcript,
+              episodeDescription,
+            });
+
+            const descResult = await generateObject({
+              model: descriptionModel,
+              schema: descriptionChapterOutputSchema,
+              system: descSystemPrompt,
+              prompt: descUserPrompt,
+            });
+
+            const descOutput = descResult.object;
+
+            // Run chapter guardrails
+            const chapterCheck = checkChapterTitles(
+              descOutput.chapters.map((c) => c.title)
+            );
+            if (!chapterCheck.passed) {
+              console.warn("[PASS 4] Chapter guardrail violations:", chapterCheck.violations);
+            }
+
+            generated.youtubeDescription = descOutput.youtubeDescription;
+            generated.spotifyDescription = descOutput.spotifyDescription;
+            generated.chapters = descOutput.chapters;
+            generated.descriptionSEOKeywords = descOutput.descriptionSEOKeywords;
+            generated.descriptionScore = descOutput.descriptionScore;
+            generated.chapterScore = descOutput.chapterScore;
+
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Descriptions and ${descOutput.chapters.length} chapter titles generated.`,
+            });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            console.warn("[PASS 4] Description generation failed:", reason);
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `[WARNING] Description generation failed: ${reason}. Titles are still available.`,
+            });
+          }
+
+          // === DB: Save results ===
+          const runDurationMs = Date.now() - runStartTime;
+          const totalCandidates = allYoutubeTitles.length + allSpotifyTitles.length;
+
+          if (runId) {
+            await Promise.all([
+              updateGenerationRun(runId, {
+                status: "complete",
+                totalCandidatesGenerated: totalCandidates,
+                runDurationMs,
+              }),
+              insertTitleResults(runId, generated.youtubeTitles || [], "youtube", true),
+              insertTitleResults(runId, generated.spotifyTitles || [], "spotify", true),
+              insertTitleResults(
+                runId,
+                eliminatedYT.map((t) => ({ ...t, rejectionReason: `Eliminated (scored ${t.score?.total ?? "N/A"}/100)` })),
+                "youtube",
+                false
+              ),
+              insertTitleResults(
+                runId,
+                eliminatedSP.map((t) => ({ ...t, rejectionReason: `Eliminated (scored ${t.score?.total ?? "N/A"}/100)` })),
+                "spotify",
+                false
+              ),
+              insertModelPerformance(runId, modelStats),
+            ]);
+          }
+
           sendSSE(controller, encoder, { type: "complete", data: generated });
         } catch (err) {
           const message =
             err instanceof Error ? err.message : "Generation failed";
+          if (runId) {
+            await updateGenerationRun(runId, { status: "error" });
+          }
           sendSSE(controller, encoder, { type: "error", message });
         } finally {
           controller.close();
