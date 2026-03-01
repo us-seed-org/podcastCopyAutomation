@@ -105,7 +105,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
 
           const noGuestResearch = {
             guest: {
-              name: hasNoGuest ? "N/A - Solo Episode" : (guestName.trim() || "N/A - Solo Episode"),
+              name: "N/A - Solo Episode",
               bio: "This episode has no external guest. Content is driven by hosts' discussion and transcript topics.",
               credentials: [],
               socialPresence: "N/A - no external guest",

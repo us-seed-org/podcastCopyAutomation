@@ -96,12 +96,8 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
                 id="guestName"
                 placeholder="e.g., Andrew Huberman (Leave blank for solo episodes)"
                 value={guestName}
-                onChange={(e) => {
-                  setGuestName(e.target.value);
-                  setErrors((prev) => ({ ...prev, guestName: "" }));
-                }}
+                onChange={(e) => setGuestName(e.target.value)}
               />
-              {errors.guestName && <p className="text-sm text-destructive">{errors.guestName}</p>}
             </div>
 
             <div className="space-y-2">

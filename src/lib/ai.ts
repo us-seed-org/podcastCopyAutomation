@@ -42,7 +42,12 @@ const googleProvider = process.env.GOOGLE_API_KEY
  * all others route to openaiProvider.
  */
 function selectModel(model: string) {
-  if (model.startsWith("gemini") && googleProvider) {
+  if (model.startsWith("gemini")) {
+    if (!googleProvider) {
+      throw new Error(
+        `Model "${model}" requires GOOGLE_API_KEY environment variable`
+      );
+    }
     return googleProvider(model);
   }
   return openaiProvider(model);

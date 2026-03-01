@@ -155,7 +155,6 @@ function isTransientError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
   return msg.includes("429") || msg.includes("rate limit") ||
-    msg.includes("not found") || msg.includes("404") ||
     msg.includes("503") || msg.includes("service unavailable") ||
     msg.includes("timeout") || msg.includes("aborted") ||
     msg.includes("econnreset") || msg.includes("socket hang up");
@@ -451,9 +450,9 @@ async function insertModelPerformance(
       model_name: name,
       titles_generated: stats.generated,
       titles_selected: stats.selected,
-      avg_score: stats.generated > 0 ? Math.round((stats.totalScore / stats.generated) * 100) / 100 : null,
-      avg_thumb_score: stats.generated > 0 && stats.totalThumbScore > 0
-        ? Math.round((stats.totalThumbScore / stats.generated) * 100) / 100
+      avg_score: stats.selected > 0 ? Math.round((stats.totalScore / stats.selected) * 100) / 100 : null,
+      avg_thumb_score: stats.selected > 0 && stats.totalThumbScore > 0
+        ? Math.round((stats.totalThumbScore / stats.selected) * 100) / 100
         : null,
       generation_time_ms: stats.timeMs,
       had_errors: stats.hadErrors,
@@ -1142,12 +1141,16 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               episodeDescription,
             });
 
+            const descAbort = new AbortController();
+            const descTimeout = setTimeout(() => descAbort.abort(), 120_000);
             const descResult = await generateObject({
               model: descriptionModel,
               schema: descriptionChapterOutputSchema,
               system: descSystemPrompt,
               prompt: descUserPrompt,
+              abortSignal: descAbort.signal,
             });
+            clearTimeout(descTimeout);
 
             const descOutput = descResult.object;
 

@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import { generateObject } from "ai";
 import { generationModel, scoringModel } from "./src/lib/ai";
 import { buildGenerationSystemPrompt, buildGenerationUserPrompt } from "./src/lib/prompts/generation-system";
@@ -51,7 +52,6 @@ async function run() {
     console.log("Scored Titles:");
     // console.log(JSON.stringify(scores.object.youtubeTitles, null, 2));
 
-    const fs = require('fs');
     fs.writeFileSync('debug_output.json', JSON.stringify({
         generated: res.object.youtubeTitles,
         scored: scores.object.youtubeTitles

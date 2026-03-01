@@ -16,7 +16,7 @@ const descriptionScoreSchema = z.object({
 const chapterScoreSchema = z.object({
   specificityAvg: z.number().min(0).max(25),
   activeVoice: z.number().min(0).max(25),
-  noBannedPatterns: z.number().min(0).max(25),
+  patternCompliance: z.number().min(0).max(25),
   miniHookQuality: z.number().min(0).max(25),
   total: z.number().min(0).max(100),
 });

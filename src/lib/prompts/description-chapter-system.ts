@@ -139,7 +139,7 @@ Return a JSON object:
   "chapterScore": {
     "specificityAvg": 0-25,
     "activeVoice": 0-25,
-    "noBannedPatterns": 0-25,
+    "patternCompliance": 0-25,
     "miniHookQuality": 0-25,
     "total": 0-100
   }
@@ -154,7 +154,7 @@ Return a JSON object:
 - humanVoice: Does it sound like a real person wrote it?
 - specificityAvg: Do chapter titles contain specific details, not vague labels?
 - activeVoice: Do chapter titles use strong active verbs?
-- noBannedPatterns: Zero em dashes, arrows, parentheticals, semicolons?
+- patternCompliance: Zero em dashes, arrows, parentheticals, semicolons?
 - miniHookQuality: Would someone skip to each chapter based on its title alone?
 
 ## CRITICAL RULES

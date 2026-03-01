@@ -61,7 +61,7 @@ export interface DescriptionScore {
 export interface ChapterScore {
   specificityAvg: number;
   activeVoice: number;
-  noBannedPatterns: number;
+  patternCompliance: number;
   miniHookQuality: number;
   total: number;
 }

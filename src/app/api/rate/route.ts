@@ -17,9 +17,17 @@ export async function POST(request: Request) {
       return Response.json({ error: "humanRating must be a number between 1 and 5" }, { status: 400 });
     }
 
+    if (humanNotes !== undefined && typeof humanNotes !== "string") {
+      return Response.json({ error: "humanNotes must be a string" }, { status: 400 });
+    }
+
     const updates: Record<string, unknown> = {};
     if (humanRating !== undefined) updates.human_rating = humanRating;
     if (humanNotes !== undefined) updates.human_notes = humanNotes;
+
+    if (Object.keys(updates).length === 0) {
+      return Response.json({ error: "No fields to update" }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from("title_results")

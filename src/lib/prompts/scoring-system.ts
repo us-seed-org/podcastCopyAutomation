@@ -24,7 +24,7 @@ You must score BOTH the titles AND the thumbnail text independently.
 ## THUMBNAIL TEXT SCORING PRINCIPLES
 
 1. **Thumbnail text must complement the title, NEVER repeat it.** If any significant word from the title appears in the thumbnail text, titleComplement maxes at 5.
-2. **2-5 words only.** 6+ words = brevityAndClarity score of 0.
+2. **3-5 words only.** 6+ words = brevityAndClarity score of 0.
 3. **Must trigger a gut reaction or intellectual intrigue.** If the emotional response is merely "interesting," emotionalPunch maxes at 10. (Exception: Conceptual reframes score high on intellectual intrigue).
 4. **Score against the thumbnail text calibration benchmarks** in the rubric below.
 

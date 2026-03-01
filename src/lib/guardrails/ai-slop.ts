@@ -110,7 +110,7 @@ export function checkChapterTitles(chapterTitles: string[]): GuardrailResult {
         break;
       }
     }
-    // Character count check (30-60 target, allow some flex)
+    // Character count check (10-60 target)
     if (title.length > 60) {
       violations.push(`Chapter "${title}" is ${title.length} chars (max 60)`);
     }

@@ -46,8 +46,9 @@ interface Run {
 
 function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return "N/A";
-  if (ms < 60000) return `${Math.round(ms / 1000)}s`;
-  return `${Math.round(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
 }
 
 function formatDate(iso: string): string {
@@ -57,11 +58,14 @@ function formatDate(iso: string): string {
 
 function StarRating({ rating, onChange }: { rating: number | null; onChange: (r: number) => void }) {
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-0.5" role="group" aria-label="Rating">
       {[1, 2, 3, 4, 5].map((star) => (
         <button
+          type="button"
           key={star}
           onClick={() => onChange(star)}
+          aria-label={`${star} star${star > 1 ? "s" : ""}`}
+          aria-pressed={(rating || 0) >= star}
           className={`text-sm ${(rating || 0) >= star ? "text-yellow-400" : "text-muted-foreground/30"} hover:text-yellow-400 transition-colors cursor-pointer`}
         >
           ★
@@ -235,7 +239,7 @@ export default function RunsPage() {
                         {tr.platform}
                       </span>
                       <span className="flex-1 text-sm font-medium">{tr.title}</span>
-                      {tr.score_total && <ScoreBadge score={tr.score_total} />}
+                      {tr.score_total != null && <ScoreBadge score={tr.score_total} />}
                       <StarRating rating={tr.human_rating} onChange={(r) => handleRate(tr.id, r)} />
                       <span className="text-xs text-muted-foreground">{tr.source_model}</span>
                     </div>
