@@ -1,6 +1,7 @@
 import type { ResearchOutput } from "./research";
 import type { GenerationOutput } from "./generation";
 import type { YouTubeAnalysis } from "./youtube";
+import type { PipelineTraceEntry, PipelineSummary } from "./pipeline-trace";
 
 export type PipelineStep = "idle" | "research" | "youtube" | "generation" | "complete" | "error";
 
@@ -14,6 +15,8 @@ export interface PipelineState {
   generation: GenerationOutput | null;
   error: string | null;
   isRegenerating: boolean;
+  traceEntries: PipelineTraceEntry[];
+  pipelineSummary: PipelineSummary | null;
 }
 
 export interface FormInput {
@@ -39,4 +42,7 @@ export type PipelineAction =
   | { type: "GENERATION_COMPLETE"; data: GenerationOutput }
   | { type: "GENERATION_ERROR"; error: string }
   | { type: "RESET" }
-  | { type: "REGENERATE" };
+  | { type: "REGENERATE" }
+  | { type: "PIPELINE_TRACE"; entry: PipelineTraceEntry }
+  | { type: "PIPELINE_SUMMARY"; summary: PipelineSummary };
+

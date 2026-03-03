@@ -16,6 +16,8 @@ const initialState: PipelineState = {
   generation: null,
   error: null,
   isRegenerating: false,
+  traceEntries: [],
+  pipelineSummary: null,
 };
 
 function pipelineReducer(state: PipelineState, action: PipelineAction): PipelineState {
@@ -77,6 +79,18 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         generationStatus: "Regenerating...",
         error: null,
         isRegenerating: true,
+        traceEntries: [],
+        pipelineSummary: null,
+      };
+    case "PIPELINE_TRACE":
+      return {
+        ...state,
+        traceEntries: [...state.traceEntries, action.entry],
+      };
+    case "PIPELINE_SUMMARY":
+      return {
+        ...state,
+        pipelineSummary: action.summary,
       };
     default:
       return state;
@@ -85,13 +99,17 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
 
 async function readSSEStream(
   response: Response,
-  onStatus: (msg: string) => void,
-  onComplete: (data: unknown) => void,
-  onError: (msg: string) => void
+  callbacks: {
+    onStatus: (msg: string) => void;
+    onComplete: (data: unknown) => void;
+    onError: (msg: string) => void;
+    onTrace?: (entry: unknown) => void;
+    onSummary?: (summary: unknown) => void;
+  }
 ) {
   const reader = response.body?.getReader();
   if (!reader) {
-    onError("No response body");
+    callbacks.onError("No response body");
     return;
   }
 
@@ -113,11 +131,15 @@ async function readSSEStream(
       try {
         const json = JSON.parse(dataLine.slice(6));
         if (json.type === "status") {
-          onStatus(json.message);
+          callbacks.onStatus(json.message);
         } else if (json.type === "complete") {
-          onComplete(json.data);
+          callbacks.onComplete(json.data);
         } else if (json.type === "error") {
-          onError(json.message);
+          callbacks.onError(json.message);
+        } else if (json.type === "pipeline_trace" && callbacks.onTrace) {
+          callbacks.onTrace(json.entry);
+        } else if (json.type === "pipeline_summary" && callbacks.onSummary) {
+          callbacks.onSummary(json.summary);
         }
       } catch {
         // Skip malformed JSON
@@ -158,12 +180,13 @@ export function useGenerationPipeline() {
           return;
         }
 
-        await readSSEStream(
-          res,
-          (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
-          (data) => dispatch({ type: "GENERATION_COMPLETE", data: data as GenerationOutput }),
-          (msg) => dispatch({ type: "GENERATION_ERROR", error: msg })
-        );
+        await readSSEStream(res, {
+          onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
+          onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data: data as GenerationOutput }),
+          onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
+          onTrace: (entry) => dispatch({ type: "PIPELINE_TRACE", entry: entry as import("@/types/pipeline-trace").PipelineTraceEntry }),
+          onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
+        });
       } catch (err) {
         dispatch({
           type: "GENERATION_ERROR",
@@ -212,17 +235,16 @@ export function useGenerationPipeline() {
             return;
           }
 
-          await readSSEStream(
-            res,
-            (msg) => dispatch({ type: "RESEARCH_STATUS", status: msg }),
-            (data) => {
+          await readSSEStream(res, {
+            onStatus: (msg) => dispatch({ type: "RESEARCH_STATUS", status: msg }),
+            onComplete: (data) => {
               researchRef.current = data as ResearchOutput;
               dispatch({ type: "RESEARCH_COMPLETE", data: data as ResearchOutput });
               researchDone = true;
               checkAndRunGeneration();
             },
-            (msg) => dispatch({ type: "RESEARCH_ERROR", error: msg })
-          );
+            onError: (msg) => dispatch({ type: "RESEARCH_ERROR", error: msg }),
+          });
         } catch (err) {
           dispatch({
             type: "RESEARCH_ERROR",

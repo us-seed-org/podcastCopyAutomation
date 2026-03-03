@@ -121,6 +121,34 @@ Your titles will be rejected if they contain ANY of these patterns:
 - [Question]? [Second Question]? (double question = indecisive, not punchy)
 - [Statement]. [Filler tag like "Why It Matters"] (cut the filler, the statement IS the title)
 
+## CALIBRATION EXAMPLES
+
+These examples show what each archetype looks like when executed well vs. poorly.
+
+### Authority + Shocking
+GOOD: "The Doctor Who Fasted for 44 Days Exposed Everything Wrong with Nutrition Science" — Thumbnail: "44 DAYS NO FOOD" (Score: 88) WHY IT WORKS: Specific credential + extreme timeframe + "exposed" creates curiosity gap
+GOOD: "Harvard Professor: Your Morning Routine Is Destroying Your Brain" — Thumbnail: "BRAIN DAMAGE" (Score: 85) WHY IT WORKS: Institutional authority + contrarian claim against universal habit
+BAD: "Expert Reveals Shocking Health Secrets You Need to Know" — WHY IT FAILS: "Expert" is vague, "shocking secrets" is AI slop, "you need to know" is filler
+BAD: "Doctor Shares Mind-Blowing Insights About Wellness" — WHY IT FAILS: Every word is generic. No specificity, no real claim.
+
+### Mechanism + Outcome
+GOOD: "He Made $2.7M Selling One Digital Product (Here's the Funnel)" — Thumbnail: "$2.7M FUNNEL" (Score: 86) WHY IT WORKS: Exact number + "one" emphasizes simplicity + parenthetical promises mechanism
+GOOD: "The 5-Minute Morning That Replaced My Entire Workout" — Thumbnail: "5 MIN ONLY" (Score: 83) WHY IT WORKS: Specific time + "replaced" implies superiority + relatable context
+BAD: "How to Build a Successful Online Business From Scratch" — WHY IT FAILS: Generic promise, no mechanism, no specificity
+BAD: "The Strategy That Will Transform Your Productivity" — WHY IT FAILS: "The strategy" without naming it, "transform" is vague
+
+### Curiosity Gap
+GOOD: "I Asked 100 Billionaires for Their #1 Investing Rule" — Thumbnail: "100 BILLIONAIRES" (Score: 87) WHY IT WORKS: Specific sample size + "#1" promises distillation + you MUST click to learn the rule
+GOOD: "The Reason 97% of Restaurants Fail in Year One" — Thumbnail: "97% FAIL" (Score: 84) WHY IT WORKS: Alarming stat + specific timeframe + "the reason" (singular) teases one insight
+BAD: "Why Most People Fail at Their Goals" — WHY IT FAILS: "Most people" and "goals" are impossibly vague, no scroll-stop
+BAD: "The Surprising Truth About Success" — WHY IT FAILS: Classic AI slop pattern. Says nothing specific.
+
+### Negative Contrarian
+GOOD: "Stop Doing Cold Plunges (A Cardiologist Explains Why)" — Thumbnail: "STOP NOW" (Score: 86) WHY IT WORKS: Commands action against trend + credential backs the claim + parenthetical teases reasoning
+GOOD: "Why I Quit My $400K Job at Google (It's Not What You Think)" — Thumbnail: "I QUIT GOOGLE" (Score: 85) WHY IT WORKS: Specific salary + brand name + subverts expectation
+BAD: "Why Everything You Know About Dieting Is Wrong" — WHY IT FAILS: "Everything you know" is lazy contrarian. No specific claim.
+BAD: "The Truth About Why Hustle Culture Is Toxic" — WHY IT FAILS: "The truth about" is AI slop + "hustle culture is toxic" is already consensus, not contrarian
+
 ## CHANNEL-SPECIFIC VOICE (CRITICAL)
 
 You will receive YOUTUBE COMPETITIVE ANALYSIS detailing the historical style, vocabulary, and formatting preferences of this specific channel. 
@@ -632,6 +660,18 @@ Do NOT inflate scores to meet a threshold.
 
 NOTE: Do NOT include reasoning or thinking outside the JSON structure.
 All work must be captured in the rejectedTitles and reasoningNotes fields.
+
+## PRE-FLIGHT SELF-CHECK (MANDATORY)
+
+Before outputting your final JSON, run EVERY title through these 5 tests. If ANY title fails ANY test, replace it BEFORE outputting.
+
+1. **Scroll Test**: Read the title as if it appeared in a feed of 50 videos. Would you ACTUALLY stop scrolling? If you hesitate, it fails.
+2. **AI Slop Test**: Does it contain ANY phrase from the banned list above? (reveals, shocking, mind-blowing, game-changing, you need to know, the truth about, what nobody tells you, etc.) If yes, it fails.
+3. **Tier Compliance Test**: Does the guest name usage match their tier? Tier 1 names MUST be in the title (they ARE the hook). Tiers 0, 2, and 3 names must NOT be in the title (Tier 2 should use credential instead of name). Mismatch = fail.
+4. **Specificity Test**: Remove the guest name and any numbers. Is the remaining title still about something SPECIFIC, or could it apply to any podcast? If generic, it fails.
+5. **Thumbnail Harmony Test** (YouTube only): Read the thumbnail text, then the title. Do they create a 1-2 punch where the thumbnail is the emotional hook and the title adds context? If they're redundant or disconnected, it fails.
+
+Do NOT output titles that fail any test. Generate replacements inline.
 
 ## OUTPUT FORMAT
 

@@ -7,6 +7,7 @@ import { ScoreBadge } from "@/components/score-badge";
 import { ScoreBreakdownChart } from "@/components/score-breakdown";
 import { ThumbnailTextScoreChart } from "@/components/thumbnail-text-score";
 import { CopyButton } from "@/components/copy-button";
+import { HumanFeedback } from "@/components/human-feedback";
 import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon } from "lucide-react";
 import type { TitleOption, TitleArchetype, ThumbnailArchetype } from "@/types/generation";
 
@@ -159,6 +160,7 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
                 <ThumbnailTextScoreChart score={title.thumbnailTextScore} />
               </div>
             )}
+            <HumanFeedback titleResultId={title.titleResultId} />
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

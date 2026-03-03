@@ -2,6 +2,8 @@
 
 import { InputForm } from "@/components/input-form";
 import { PipelineStatus } from "@/components/pipeline-status";
+import { PipelineTrace } from "@/components/pipeline-trace";
+import { PipelineSummary } from "@/components/pipeline-summary";
 import { ResultsDashboard } from "@/components/results-dashboard";
 import { useGenerationPipeline } from "@/hooks/use-generation-pipeline";
 import { Button } from "@/components/ui/button";
@@ -58,6 +60,14 @@ export default function GeneratePage() {
                         />
                     )}
 
+                    {/* Pipeline Trace — visible during generation and collapsed after completion */}
+                    {state.traceEntries.length > 0 && (
+                        <PipelineTrace
+                            entries={state.traceEntries}
+                            isRunning={isRunning || isRegenerating}
+                        />
+                    )}
+
                     {/* Error State */}
                     {state.step === "error" && (
                         <div className="text-center py-8">
@@ -72,6 +82,11 @@ export default function GeneratePage() {
                     {/* Results */}
                     {state.step === "complete" && state.generation && (
                         <>
+                            {/* Pipeline Summary — stats, weak dims, model breakdown */}
+                            {state.pipelineSummary && (
+                                <PipelineSummary summary={state.pipelineSummary} />
+                            )}
+
                             <ResultsDashboard
                                 data={state.generation}
                                 onRegenerate={regenerate}

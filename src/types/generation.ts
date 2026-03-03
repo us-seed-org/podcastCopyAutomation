@@ -32,6 +32,7 @@ export interface TitleOption {
   sourceModel?: string;
   pairwiseWins?: number;
   pairwiseRank?: number;
+  titleResultId?: string;
 }
 
 export interface RejectedTitle {

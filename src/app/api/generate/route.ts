@@ -23,6 +23,8 @@ import { checkAiSlop, checkThumbnailText, checkChapterTitles } from "@/lib/guard
 import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
 import { runPairwiseTournament } from "@/lib/pairwise-tournament";
 import { supabase } from "@/lib/supabase";
+import { PipelineLogger } from "@/lib/pipeline-logger";
+import type { PipelineTraceEntry } from "@/types/pipeline-trace";
 
 export const maxDuration = 300;
 
@@ -141,8 +143,8 @@ interface GenerationResult {
   rejectedTitles: ScoredTitle[];
 }
 
-const REWRITE_THRESHOLD = 70;
-const MAX_REWRITE_ATTEMPTS = 3;
+const REWRITE_THRESHOLD = 60;
+const MAX_REWRITE_ATTEMPTS = 1;
 const TARGET_YOUTUBE_COUNT = 4;
 const TARGET_SPOTIFY_COUNT = 2;
 const PAIRWISE_TOP_N = 5;
@@ -153,6 +155,14 @@ function sendSSE(
   data: unknown
 ) {
   controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
+}
+
+function sendTrace(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  entry: PipelineTraceEntry
+) {
+  sendSSE(controller, encoder, { type: "pipeline_trace", entry });
 }
 
 function getAllTitleTexts(titles: { title: string }[]): string[] {
@@ -476,8 +486,8 @@ async function insertTitleResults(
   titles: any[],
   platform: "youtube" | "spotify",
   wasSelected: boolean
-): Promise<void> {
-  if (!supabase || !runId) return;
+): Promise<string[]> {
+  if (!supabase || !runId) return [];
   try {
     const rows = titles.map((t: any) => ({
       run_id: runId,
@@ -506,10 +516,15 @@ async function insertTitleResults(
       was_rewritten: t.rewritten || false,
       rejection_reason: t.rejectionReason || null,
     }));
-    const { error } = await supabase.from("title_results").insert(rows);
-    if (error) console.warn("[DB] Failed to insert title_results:", error.message);
+    const { data, error } = await supabase.from("title_results").insert(rows).select("id");
+    if (error) {
+      console.warn("[DB] Failed to insert title_results:", error.message);
+      return [];
+    }
+    return (data || []).map((r: any) => r.id);
   } catch (err) {
     console.warn("[DB] Error inserting title_results:", err);
+    return [];
   }
 }
 
@@ -539,6 +554,58 @@ async function insertModelPerformance(
   }
 }
 
+async function insertPipelineLogs(
+  runId: string,
+  entries: import("@/types/pipeline-trace").PipelineTraceEntry[]
+): Promise<void> {
+  if (!supabase || !runId || entries.length === 0) return;
+  try {
+    const rows = entries.map((e) => ({
+      run_id: runId,
+      timestamp: e.timestamp,
+      pass: e.pass,
+      event: e.event,
+      title: e.title || null,
+      model: e.model || null,
+      platform: e.platform || null,
+      archetype: e.archetype || null,
+      score_total: e.scoreTotal ?? null,
+      score_dimensions: e.scoreDimensions || null,
+      thumbnail_text: e.thumbnailText || null,
+      thumbnail_score_total: e.thumbnailScoreTotal ?? null,
+      thumbnail_score_dimensions: e.thumbnailScoreDimensions || null,
+      reason: e.reason || null,
+      rewrite_attempt: e.rewriteAttempt ?? null,
+      pairwise_rank: e.pairwiseRank ?? null,
+      pairwise_wins: e.pairwiseWins ?? null,
+    }));
+
+    // Batch insert in chunks of 50
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { error } = await supabase.from("pipeline_logs").insert(chunk);
+      if (error) console.warn(`[DB] Failed to insert pipeline_logs chunk ${i}:`, error.message);
+    }
+  } catch (err) {
+    console.warn("[DB] Error inserting pipeline_logs:", err);
+  }
+}
+
+async function updateRunSummary(
+  runId: string,
+  summary: import("@/types/pipeline-trace").PipelineSummary
+): Promise<void> {
+  if (!supabase || !runId) return;
+  try {
+    await supabase.from("generation_runs").update({
+      pipeline_summary: summary,
+    }).eq("id", runId);
+  } catch (err) {
+    console.warn("[DB] Error updating pipeline_summary:", err);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -556,6 +623,7 @@ export async function POST(request: Request) {
       async start(controller) {
         const runStartTime = Date.now();
         let runId: string | null = null;
+        const logger = new PipelineLogger((entry) => sendTrace(controller, encoder, entry));
 
         try {
           const researchStr =
@@ -605,6 +673,7 @@ export async function POST(request: Request) {
           });
 
           // === PASS 1: Multi-model parallel generation ===
+          logger.startPass("1");
           const systemPrompt = buildGenerationSystemPrompt();
           const userPrompt = buildGenerationUserPrompt({
             research: researchStr,
@@ -651,9 +720,24 @@ export async function POST(request: Request) {
 
               for (const t of gen.youtubeTitles || []) {
                 allYoutubeTitles.push({ ...t, sourceModel: modelName });
+                logger.log({
+                  pass: "1",
+                  event: "title_generated",
+                  title: t.title,
+                  model: modelName,
+                  platform: "youtube",
+                  archetype: t.archetype,
+                });
               }
               for (const t of gen.spotifyTitles || []) {
                 allSpotifyTitles.push({ ...t, sourceModel: modelName });
+                logger.log({
+                  pass: "1",
+                  event: "title_generated",
+                  title: t.title,
+                  model: modelName,
+                  platform: "spotify",
+                });
               }
               allRejectedTitles.push(...(gen.rejectedTitles || []));
 
@@ -671,6 +755,12 @@ export async function POST(request: Request) {
               sendSSE(controller, encoder, {
                 type: "status",
                 message: `[WARNING] ${modelName} failed: ${reason}`
+              });
+              logger.log({
+                pass: "1",
+                event: "pipeline_warning",
+                model: modelName,
+                reason: `Model failed: ${reason.slice(0, 200)}`,
               });
               modelStats.set(modelName, {
                 generated: 0,
@@ -703,7 +793,17 @@ export async function POST(request: Request) {
           const dedupedYoutube: typeof allYoutubeTitles = [];
           for (const candidate of allYoutubeTitles) {
             const sameAngleCount = dedupedYoutube.filter(t => areSameAngle(t.title, candidate.title)).length;
-            if (sameAngleCount === 0) dedupedYoutube.push(candidate);
+            if (sameAngleCount === 0) {
+              dedupedYoutube.push(candidate);
+            } else {
+              logger.log({
+                pass: "1",
+                event: "dedup_removed",
+                title: candidate.title,
+                model: candidate.sourceModel,
+                reason: "Redundant angle — overlapping key nouns with existing title",
+              });
+            }
           }
           if (dedupedYoutube.length < allYoutubeTitles.length) {
             sendSSE(controller, encoder, {
@@ -734,11 +834,20 @@ export async function POST(request: Request) {
             ...ytThumbCheck.violations,
           ];
           if (allViolations.length > 0) {
+            for (const v of allViolations) {
+              logger.log({
+                pass: "1",
+                event: "guardrail_violation",
+                title: typeof v === "string" ? undefined : (v as any).title,
+                reason: typeof v === "string" ? v : JSON.stringify(v),
+              });
+            }
             sendSSE(controller, encoder, {
               type: "status",
               message: `${allViolations.length} guardrail violation(s) detected — scoring will penalize affected titles.`,
             });
           }
+          logger.endPass("1");
 
           const spSlopCheck = checkAiSlop(getAllTitleTexts(allSpotifyTitles));
           if (!spSlopCheck.passed) {
@@ -746,6 +855,7 @@ export async function POST(request: Request) {
           }
 
           // === PASS 2: Dual-scorer panel ===
+          logger.startPass("2");
           const scorerNames = geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
           sendSSE(controller, encoder, {
             type: "status",
@@ -807,13 +917,27 @@ export async function POST(request: Request) {
                 const key = normalizeTitle(t.title);
                 const scoredItem = ytScoreLookup.get(key);
                 if (scoredItem) {
-                  return {
+                  const merged = {
                     ...t,
                     score: scoredItem.score ?? t.score,
                     scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
                     platformNotes: scoredItem.platformNotes ?? t.platformNotes,
                     thumbnailTextScore: scoredItem.thumbnailTextScore ?? t.thumbnailTextScore,
                   };
+                  logger.log({
+                    pass: "2",
+                    event: "title_scored",
+                    title: merged.title,
+                    model: merged.sourceModel,
+                    platform: "youtube",
+                    archetype: merged.archetype,
+                    scoreTotal: merged.score?.total,
+                    scoreDimensions: merged.score,
+                    thumbnailText: merged.thumbnailText,
+                    thumbnailScoreTotal: merged.thumbnailTextScore?.total,
+                    thumbnailScoreDimensions: merged.thumbnailTextScore,
+                  });
+                  return merged;
                 }
                 return t;
               });
@@ -823,19 +947,31 @@ export async function POST(request: Request) {
                 const key = normalizeTitle(t.title);
                 const scoredItem = spScoreLookup.get(key);
                 if (scoredItem) {
-                  return {
+                  const merged = {
                     ...t,
                     score: scoredItem.score ?? t.score,
                     scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
                     platformNotes: scoredItem.platformNotes ?? t.platformNotes,
                   };
+                  logger.log({
+                    pass: "2",
+                    event: "title_scored",
+                    title: merged.title,
+                    model: merged.sourceModel,
+                    platform: "spotify",
+                    scoreTotal: merged.score?.total,
+                    scoreDimensions: merged.score,
+                  });
+                  return merged;
                 }
                 return t;
               });
             }
           }
+          logger.endPass("2");
 
           // === PASS 2.75: Thumbnail Text Refinement ===
+          logger.startPass("2.75");
           const THUMB_REFINEMENT_THRESHOLD = 75;
           const weakThumbTitles = allYoutubeTitles
             .filter((t) => (t.thumbnailTextScore?.total || 0) < THUMB_REFINEMENT_THRESHOLD)
@@ -890,6 +1026,7 @@ export async function POST(request: Request) {
                   );
                   if (idx === -1) continue;
                   const oldScore = allYoutubeTitles[idx].thumbnailTextScore?.total || 0;
+                  const oldThumb = allYoutubeTitles[idx].thumbnailText;
                   if (ref.bestScore.total > oldScore) {
                     allYoutubeTitles[idx] = {
                       ...allYoutubeTitles[idx],
@@ -897,6 +1034,14 @@ export async function POST(request: Request) {
                       thumbnailTextScore: ref.bestScore as any,
                     };
                     replacedCount++;
+                    logger.log({
+                      pass: "2.75",
+                      event: "thumbnail_refined",
+                      title: allYoutubeTitles[idx].title,
+                      thumbnailText: ref.bestAlternative,
+                      thumbnailScoreTotal: ref.bestScore.total,
+                      reason: `Replaced "${oldThumb}" (${oldScore}/100) → "${ref.bestAlternative}" (${ref.bestScore.total}/100)`,
+                    });
                   }
                 }
 
@@ -922,6 +1067,7 @@ export async function POST(request: Request) {
           }
 
           // === PASS 2.5: Pairwise Tournament ===
+          logger.startPass("2.5");
           if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
             sendSSE(controller, encoder, {
               type: "status",
@@ -974,9 +1120,19 @@ export async function POST(request: Request) {
 
                 allYoutubeTitles = allYoutubeTitles.map((t) => {
                   const ranked = rankedWithPairwiseRank.find((rt) => normalizeTitle(rt.title) === normalizeTitle(t.title));
-                  return ranked
-                    ? { ...t, pairwiseWins: ranked.pairwiseWins, pairwiseRank: ranked.pairwiseRank }
-                    : t;
+                  if (ranked) {
+                    logger.log({
+                      pass: "2.5",
+                      event: "pairwise_result",
+                      title: ranked.title,
+                      model: (t as any).sourceModel,
+                      pairwiseRank: ranked.pairwiseRank,
+                      pairwiseWins: ranked.pairwiseWins,
+                      scoreTotal: (t as any).score?.total,
+                    });
+                    return { ...t, pairwiseWins: ranked.pairwiseWins, pairwiseRank: ranked.pairwiseRank };
+                  }
+                  return t;
                 });
               }
             } catch (error) {
@@ -987,6 +1143,7 @@ export async function POST(request: Request) {
               });
             }
           }
+          logger.endPass("2.5");
 
           // === Selection ===
           const hasPairwiseData = allYoutubeTitles.some((t: any) => t.pairwiseRank !== undefined);
@@ -1011,6 +1168,31 @@ export async function POST(request: Request) {
             : allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
           const selectedSpotify = allSpotifyTitles.slice(0, TARGET_SPOTIFY_COUNT);
 
+          // Log selected titles
+          for (const t of selectedYoutube) {
+            logger.log({
+              pass: "2.5",
+              event: "title_selected",
+              title: t.title,
+              model: t.sourceModel,
+              platform: "youtube",
+              archetype: t.archetype,
+              scoreTotal: t.score?.total,
+              pairwiseRank: t.pairwiseRank,
+              pairwiseWins: t.pairwiseWins,
+            });
+          }
+          for (const t of selectedSpotify) {
+            logger.log({
+              pass: "2.5",
+              event: "title_selected",
+              title: t.title,
+              model: t.sourceModel,
+              platform: "spotify",
+              scoreTotal: t.score?.total,
+            });
+          }
+
           const selectedYTSet = new Set(selectedYoutube.map(t => normalizeTitle(t.title)));
           const eliminatedYT = allYoutubeTitles.filter(t => !selectedYTSet.has(normalizeTitle(t.title)));
           const eliminatedSP = allSpotifyTitles.slice(TARGET_SPOTIFY_COUNT);
@@ -1021,12 +1203,30 @@ export async function POST(request: Request) {
               title: t.title,
               rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel}${pairwiseInfo})`,
             });
+            logger.log({
+              pass: "2.5",
+              event: "title_rejected",
+              title: t.title,
+              model: t.sourceModel,
+              platform: "youtube",
+              scoreTotal: t.score?.total,
+              reason: `Eliminated in selection (scored ${safeScore}/100${pairwiseInfo})`,
+            });
           }
           for (const t of eliminatedSP) {
             const safeScore = t.score?.total ?? 'N/A';
             allRejectedTitles.push({
               title: t.title,
               rejectionReason: `Eliminated in competitive selection (scored ${safeScore}/100, from ${t.sourceModel})`,
+            });
+            logger.log({
+              pass: "2.5",
+              event: "title_rejected",
+              title: t.title,
+              model: t.sourceModel,
+              platform: "spotify",
+              scoreTotal: t.score?.total,
+              reason: `Eliminated in selection (scored ${safeScore}/100)`,
             });
           }
 
@@ -1061,6 +1261,7 @@ export async function POST(request: Request) {
           };
 
           // === PASS 3: Iterative rewrite loop ===
+          logger.startPass("3");
           for (
             let attempt = 1;
             attempt <= MAX_REWRITE_ATTEMPTS;
@@ -1240,12 +1441,12 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               for (let ri = 0; ri < ytReplacementCount; ri++) {
                 const originalIndex = weakYTIndices[ri];
                 const rewrittenItem = rewritten.youtubeTitles[ri];
+                const newScore = rewriteScored?.youtubeTitles?.[ri]?.score ||
+                  rewrittenItem.score ||
+                  generated.youtubeTitles[originalIndex].score;
                 generated.youtubeTitles[originalIndex] = {
                   ...rewrittenItem,
-                  score:
-                    rewriteScored?.youtubeTitles?.[ri]?.score ||
-                    rewrittenItem.score ||
-                    generated.youtubeTitles[originalIndex].score,
+                  score: newScore,
                   thumbnailTextScore:
                     rewriteScored?.youtubeTitles?.[ri]?.thumbnailTextScore ||
                     rewrittenItem.thumbnailTextScore ||
@@ -1253,6 +1454,17 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                   sourceModel: rewriteModelName,
                   rewritten: true,
                 };
+                logger.log({
+                  pass: "3",
+                  event: "title_rewritten",
+                  title: rewrittenItem.title,
+                  model: rewriteModelName,
+                  platform: "youtube",
+                  scoreTotal: newScore?.total,
+                  scoreDimensions: newScore,
+                  rewriteAttempt: attempt,
+                  reason: `Replaced weak title "${feedback[ri]?.title || "unknown"}"`,
+                });
               }
             }
             if (weakSPIndices.length > 0 && rewritten.spotifyTitles) {
@@ -1263,15 +1475,24 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               for (let ri = 0; ri < spReplacementCount; ri++) {
                 const originalIndex = weakSPIndices[ri];
                 const rewrittenItem = rewritten.spotifyTitles[ri];
+                const newSpScore = rewriteScored?.spotifyTitles?.[ri]?.score ||
+                  rewrittenItem.score ||
+                  generated.spotifyTitles[originalIndex].score;
                 generated.spotifyTitles[originalIndex] = {
                   ...rewrittenItem,
-                  score:
-                    rewriteScored?.spotifyTitles?.[ri]?.score ||
-                    rewrittenItem.score ||
-                    generated.spotifyTitles[originalIndex].score,
+                  score: newSpScore,
                   sourceModel: rewriteModelName,
                   rewritten: true,
                 };
+                logger.log({
+                  pass: "3",
+                  event: "title_rewritten",
+                  title: rewrittenItem.title,
+                  model: rewriteModelName,
+                  platform: "spotify",
+                  scoreTotal: newSpScore?.total,
+                  rewriteAttempt: attempt,
+                });
               }
             }
             generated.rejectedTitles = [
@@ -1283,6 +1504,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               ...(rewritten.rejectedTitles || []),
             ];
           }
+          logger.endPass("3");
 
           // === PASS 4: Description & Chapter Generation ===
           sendSSE(controller, encoder, {
@@ -1354,15 +1576,25 @@ Return the same JSON structure. Score honestly against the calibration benchmark
           const runDurationMs = Date.now() - runStartTime;
           const totalCandidates = allYoutubeTitles.length + allSpotifyTitles.length;
 
+          // Build pipeline summary for DB + SSE
+          const pipelineSummary = logger.buildSummary();
+
           if (runId) {
+            // Insert selected titles sequentially to capture IDs for human feedback
+            const ytIds = await insertTitleResults(runId, generated.youtubeTitles || [], "youtube", true);
+            const spIds = await insertTitleResults(runId, generated.spotifyTitles || [], "spotify", true);
+
+            // Attach IDs to titles so the client can use them for rating
+            ytIds.forEach((id, i) => { if (generated.youtubeTitles?.[i]) generated.youtubeTitles[i].titleResultId = id; });
+            spIds.forEach((id, i) => { if (generated.spotifyTitles?.[i]) generated.spotifyTitles[i].titleResultId = id; });
+
+            // Fire-and-forget for eliminated/rejected inserts + other DB ops
             await Promise.all([
               updateGenerationRun(runId, {
                 status: "complete",
                 totalCandidatesGenerated: totalCandidates,
                 runDurationMs,
               }),
-              insertTitleResults(runId, generated.youtubeTitles || [], "youtube", true),
-              insertTitleResults(runId, generated.spotifyTitles || [], "spotify", true),
               insertTitleResults(
                 runId,
                 eliminatedYT.map((t) => ({ ...t, rejectionReason: `Eliminated (scored ${t.score?.total ?? "N/A"}/100)` })),
@@ -1376,7 +1608,20 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                 false
               ),
               insertModelPerformance(runId, modelStats),
+              insertPipelineLogs(runId, logger.getEntries()),
+              updateRunSummary(runId, pipelineSummary),
             ]);
+          }
+
+          // Emit pipeline summary SSE
+          sendSSE(controller, encoder, { type: "pipeline_summary", summary: pipelineSummary });
+
+          // Emit warning if rewrite rate is high
+          if (pipelineSummary.rewriteRate > 50) {
+            sendSSE(controller, encoder, {
+              type: "pipeline_warning",
+              message: `High rewrite rate: ${pipelineSummary.rewriteRate.toFixed(1)}% of titles needed rewrites. Consider calibrating the generation prompt.`,
+            });
           }
 
           sendSSE(controller, encoder, { type: "complete", data: generated });
