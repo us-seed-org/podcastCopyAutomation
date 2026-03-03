@@ -75,6 +75,7 @@ export class PipelineLogger {
         if (startTime) {
             const durationMs = Date.now() - startTime;
             this.passDurations.push({ pass, durationMs });
+            this.passStartTimes.delete(pass);
             console.log(
                 `${COLORS.bold}${COLORS.blue}└─── PASS ${pass} complete (${(durationMs / 1000).toFixed(1)}s) ──────────────────────${COLORS.reset}`
             );

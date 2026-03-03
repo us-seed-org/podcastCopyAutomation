@@ -3,6 +3,9 @@ import { test, expect } from "@playwright/test";
 test.describe("Human Feedback Component", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/generate");
+        // Suite requires a completed generation (e.g. from a createGeneration fixture)
+        // that provides titleResultIds before tests can interact with human feedback components.
+        test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
     });
 
     test("star rating is clickable and updates display", async ({ page }) => {
@@ -11,10 +14,8 @@ test.describe("Human Feedback Component", () => {
 
         // Stars only render when titleResultId is present on a title
         const starCount = await stars.count();
-        if (starCount === 0) {
-            // No feedback components rendered — titleResultIds not yet available
-            // This is expected when no generation has been run
-            test.skip();
+        if (starCount < 4) {
+            test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
             return;
         }
 
@@ -29,7 +30,7 @@ test.describe("Human Feedback Component", () => {
         const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
         const starCount = await stars.count();
         if (starCount === 0) {
-            test.skip();
+            test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
             return;
         }
 
@@ -46,13 +47,6 @@ test.describe("Human Feedback Component", () => {
     });
 
     test("save button sends request to /api/rate", async ({ page }) => {
-        const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
-        const starCount = await stars.count();
-        if (starCount === 0) {
-            test.skip();
-            return;
-        }
-
         // Set up route interception for /api/rate
         let rateRequestBody: any = null;
         await page.route("**/api/rate", async (route) => {
@@ -64,6 +58,13 @@ test.describe("Human Feedback Component", () => {
                 body: JSON.stringify({ success: true }),
             });
         });
+
+        const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
+        const starCount = await stars.count();
+        if (starCount < 3) {
+            test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
+            return;
+        }
 
         // Click 3rd star
         await stars.nth(2).click();

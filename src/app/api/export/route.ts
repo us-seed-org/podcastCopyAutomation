@@ -150,7 +150,7 @@ export async function GET(request: Request) {
           if (t.pairwise_rank) lines.push(`- **Pairwise Rank**: #${t.pairwise_rank}`);
           if (t.source_model) lines.push(`- **Model**: ${t.source_model}`);
           if (t.human_rating) {
-            const safeRating = Math.min(5, Math.max(0, t.human_rating));
+            const safeRating = Math.round(Math.min(5, Math.max(0, t.human_rating)));
             lines.push(`- **Human Rating**: ${"★".repeat(safeRating)}${"☆".repeat(5 - safeRating)} (${safeRating}/5)`);
           }
           if (t.human_notes) lines.push(`- **Notes**: ${t.human_notes}`);
@@ -165,7 +165,7 @@ export async function GET(request: Request) {
           if (t.archetype) lines.push(`- **Archetype**: ${t.archetype}`);
           if (t.source_model) lines.push(`- **Model**: ${t.source_model}`);
           if (t.human_rating) {
-            const safeRating = Math.min(5, Math.max(0, t.human_rating));
+            const safeRating = Math.round(Math.min(5, Math.max(0, t.human_rating)));
             lines.push(`- **Human Rating**: ${"★".repeat(safeRating)}${"☆".repeat(5 - safeRating)} (${safeRating}/5)`);
           }
           if (t.human_notes) lines.push(`- **Notes**: ${t.human_notes}`);

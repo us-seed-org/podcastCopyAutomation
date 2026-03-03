@@ -4,7 +4,7 @@ import { researchModel, openaiProvider } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
 import { researchOutputSchema } from "@/lib/schemas/research-output";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function sampleTranscript(text: string, totalChars = 8000): string {
   if (text.length <= totalChars) return text;

@@ -210,7 +210,7 @@ interface GenerationModelConfig {
   name: string;
 }
 
-const GENERATION_CALL_TIMEOUT_MS = 60_000;
+const GENERATION_CALL_TIMEOUT_MS = 180_000;
 
 /**
  * Check if an error is transient (rate limit, temporary outage) and worth retrying.
@@ -329,7 +329,7 @@ async function scoreWithPanel(
     scorers.push({ model: geminiScoringModel, name: "Gemini 3.1 Pro" });
   }
 
-  const SCORING_CALL_TIMEOUT_MS = 45_000;
+  const SCORING_CALL_TIMEOUT_MS = 120_000;
 
   const results = await Promise.allSettled(
     scorers.map((s) => {
@@ -828,7 +828,8 @@ export async function POST(request: Request) {
             }))
           );
 
-          const allViolations = [
+          type GuardrailViolation = string | { title?: string; reason?: string;[k: string]: unknown };
+          const allViolations: GuardrailViolation[] = [
             ...ytSlopCheck.violations,
             ...ytTierCheck.violations,
             ...ytThumbCheck.violations,
@@ -838,7 +839,7 @@ export async function POST(request: Request) {
               logger.log({
                 pass: "1",
                 event: "guardrail_violation",
-                title: typeof v === "string" ? undefined : (v as any).title,
+                title: typeof v === "string" ? undefined : v.title,
                 reason: typeof v === "string" ? v : JSON.stringify(v),
               });
             }
@@ -1143,7 +1144,6 @@ export async function POST(request: Request) {
               });
             }
           }
-          logger.endPass("2.5");
 
           // === Selection ===
           const hasPairwiseData = allYoutubeTitles.some((t: any) => t.pairwiseRank !== undefined);
@@ -1259,6 +1259,7 @@ export async function POST(request: Request) {
             rejectedTitles: allRejectedTitles,
             tierClassification: scored?.tierClassification,
           };
+          logger.endPass("2.5");
 
           // === PASS 3: Iterative rewrite loop ===
           logger.startPass("3");

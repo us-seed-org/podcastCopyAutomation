@@ -82,11 +82,13 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         traceEntries: [],
         pipelineSummary: null,
       };
-    case "PIPELINE_TRACE":
+    case "PIPELINE_TRACE": {
+      const entry = { ...action.entry, id: action.entry.id ?? crypto.randomUUID() };
       return {
         ...state,
-        traceEntries: [...state.traceEntries, action.entry],
+        traceEntries: [...state.traceEntries, entry],
       };
+    }
     case "PIPELINE_SUMMARY":
       return {
         ...state,

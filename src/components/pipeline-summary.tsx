@@ -11,6 +11,21 @@ import {
 } from "lucide-react";
 import type { PipelineSummary as PipelineSummaryType } from "@/types/pipeline-trace";
 
+const THRESHOLDS = {
+    REWRITE_RATE: {
+        GOOD: 20,
+        WARNING: 50
+    },
+    SCORE_PERCENTAGE: {
+        WARNING: 50,
+        GOOD: 70
+    },
+    SCORE_NORMALIZED: {
+        WARNING: 0.5,
+        GOOD: 0.7
+    }
+};
+
 interface PipelineSummaryProps {
     summary: PipelineSummaryType;
 }
@@ -57,9 +72,9 @@ function DimensionBar({
 }) {
     const normalizedAvg = Math.min(avgScore / Math.max(maxScore, 1), 1);
     const barColor =
-        normalizedAvg >= 0.7
+        normalizedAvg >= THRESHOLDS.SCORE_NORMALIZED.GOOD
             ? "bg-emerald-500"
-            : normalizedAvg >= 0.5
+            : normalizedAvg >= THRESHOLDS.SCORE_NORMALIZED.WARNING
                 ? "bg-amber-500"
                 : "bg-red-500";
 
@@ -83,9 +98,9 @@ function DimensionBar({
 
 export function PipelineSummary({ summary }: PipelineSummaryProps) {
     const rewriteColor =
-        summary.rewriteRate < 20
+        summary.rewriteRate < THRESHOLDS.REWRITE_RATE.GOOD
             ? "bg-emerald-500/15 text-emerald-500"
-            : summary.rewriteRate < 50
+            : summary.rewriteRate < THRESHOLDS.REWRITE_RATE.WARNING
                 ? "bg-amber-500/15 text-amber-500"
                 : "bg-red-500/15 text-red-500";
 
@@ -143,7 +158,7 @@ export function PipelineSummary({ summary }: PipelineSummaryProps) {
                 </div>
 
                 {/* Rewrite Warning */}
-                {summary.rewriteRate > 50 && (
+                {summary.rewriteRate > THRESHOLDS.REWRITE_RATE.WARNING && (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                         <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
                         <p className="text-xs text-amber-300/80">
@@ -212,11 +227,13 @@ export function PipelineSummary({ summary }: PipelineSummaryProps) {
                                             <td className="px-3 py-2 text-right tabular-nums">
                                                 <span
                                                     className={
-                                                        m.avgScore >= 70
-                                                            ? "text-emerald-400"
-                                                            : m.avgScore >= 50
-                                                                ? "text-amber-400"
-                                                                : "text-red-400"
+                                                        m.avgScore == null
+                                                            ? "text-slate-400"
+                                                            : m.avgScore >= THRESHOLDS.SCORE_PERCENTAGE.GOOD
+                                                                ? "text-emerald-400"
+                                                                : m.avgScore >= THRESHOLDS.SCORE_PERCENTAGE.WARNING
+                                                                    ? "text-amber-400"
+                                                                    : "text-red-400"
                                                     }
                                                 >
                                                     {m.avgScore ?? "—"}

@@ -49,7 +49,7 @@ async function runWithConcurrency<T>(
 }
 
 const PAIRWISE_CONCURRENCY = 5;
-const PAIRWISE_CALL_TIMEOUT_MS = 30_000;
+const PAIRWISE_CALL_TIMEOUT_MS = 60_000;
 
 export async function runPairwiseTournament(
   youtubeTitles: TitleWithScore[],

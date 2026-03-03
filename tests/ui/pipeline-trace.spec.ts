@@ -1,170 +1,107 @@
 import { test, expect } from "@playwright/test";
-import type { PipelineTraceEntry } from "@/types/pipeline-trace";
-
-const MOCK_ENTRIES: PipelineTraceEntry[] = [
-    {
-        timestamp: Date.now() - 5000,
-        pass: "1",
-        event: "title_generated",
-        title: "Why 73% of Startups Fail Before Launch",
-        model: "gpt-4o",
-        platform: "youtube",
-    },
-    {
-        timestamp: Date.now() - 4000,
-        pass: "2",
-        event: "title_scored",
-        title: "Why 73% of Startups Fail Before Launch",
-        model: "gpt-4o",
-        platform: "youtube",
-        scoreTotal: 78,
-        scoreDimensions: {
-            curiosityGap: 16,
-            authoritySignal: 12,
-            emotionalTrigger: 14,
-            specificity: 15,
-            total: 78,
-        },
-    },
-    {
-        timestamp: Date.now() - 3000,
-        pass: "2",
-        event: "title_rejected",
-        title: "Expert Reveals Shocking Startup Secrets",
-        reason: "AI slop detected: 'reveals', 'shocking', 'secrets'",
-        platform: "youtube",
-    },
-    {
-        timestamp: Date.now() - 2000,
-        pass: "3",
-        event: "title_selected",
-        title: "Why 73% of Startups Fail Before Launch",
-        scoreTotal: 78,
-        pairwiseRank: 1,
-        pairwiseWins: 4,
-        platform: "youtube",
-    },
-    {
-        timestamp: Date.now() - 1000,
-        pass: "3",
-        event: "guardrail_violation",
-        title: "The Truth About Why Startups Fail",
-        reason: "Banned phrase: 'the truth about'",
-        platform: "youtube",
-    },
-];
 
 test.describe("Pipeline Trace Panel", () => {
     test.beforeEach(async ({ page }) => {
-        // Navigate to the generate page and inject mock trace entries
         await page.goto("/generate");
+
+        // Mock API responses to simulate a fast, successful generation
+        await page.route("**/api/research", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "text/event-stream",
+                body: `data: {"type": "complete", "data": {"guest": {"name": "Test"}, "brand": {}}}\n\n`,
+            });
+        });
+        await page.route("**/api/youtube-analysis", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({}),
+            });
+        });
+        await page.route("**/api/generate", async (route) => {
+            const MOCK_SSE = `
+data: {"type": "pipeline_trace", "entry": {"timestamp": 123, "pass": "1", "event": "title_generated", "title": "Why 73% of Startups Fail Before Launch", "model": "mock", "platform": "youtube"}}
+
+data: {"type": "pipeline_trace", "entry": {"timestamp": 124, "pass": "2", "event": "title_scored", "title": "Why 73% of Startups Fail Before Launch", "model": "mock", "platform": "youtube", "scoreTotal": 78, "scoreDimensions": {"total": 78}}}
+
+data: {"type": "pipeline_trace", "entry": {"timestamp": 125, "pass": "2", "event": "title_rejected", "title": "Expert Reveals Shocking Startup Secrets", "reason": "AI slop detected", "platform": "youtube"}}
+
+data: {"type": "pipeline_trace", "entry": {"timestamp": 126, "pass": "3", "event": "title_selected", "title": "Why 73% of Startups Fail Before Launch", "scoreTotal": 78, "pairwiseRank": 1, "pairwiseWins": 4, "platform": "youtube"}}
+
+data: {"type": "pipeline_trace", "entry": {"timestamp": 127, "pass": "3", "event": "guardrail_violation", "title": "The Truth About Why Startups Fail", "reason": "Banned phrase", "platform": "youtube"}}
+`;
+            // Do not complete immediately so it stays "LIVE" and "isRunning" for tests to assert
+            await route.fulfill({
+                status: 200,
+                contentType: "text/event-stream",
+                body: MOCK_SSE,
+            });
+        });
     });
 
-    test("panel renders when trace entries exist", async ({ page }) => {
-        // Evaluate in page context to inject entries into the UI
-        await page.evaluate((entries) => {
-            // Dispatch custom events that the pipeline trace listens for
-            entries.forEach((entry) => {
-                window.dispatchEvent(
-                    new CustomEvent("pipeline-trace-entry", { detail: entry })
-                );
-            });
-        }, MOCK_ENTRIES);
+    async function triggerGeneration(page: any) {
+        await page.locator('#guestName').fill("Test Guest");
+        await page.locator('#podcastName').fill("Test Podcast");
+        await page.locator('#episodeDescription').fill("Test description for mocking.");
+        await page.locator('#transcript-input').setInputFiles({
+            name: 'transcript.txt',
+            mimeType: 'text/plain',
+            buffer: Buffer.from("Test transcript with enough length so the form validation passes easily. ".repeat(10))
+        });
+        await page.locator('button[type="submit"]').click();
+    }
 
-        // The pipeline trace panel should be visible
+    test("panel renders when trace entries exist", async ({ page }) => {
+        await triggerGeneration(page);
         const tracePanel = page.getByText("Pipeline Trace");
-        // If panel is not immediately visible (depends on generation state), check it exists in DOM
         const count = await tracePanel.count();
-        if (count === 0) {
-            test.skip();
-            return;
-        }
+        expect(count).toBeGreaterThan(0);
         await expect(tracePanel).toBeAttached({ timeout: 5000 });
     });
 
     test("collapsible behavior works", async ({ page }) => {
-        // Start a generation to get the trace panel to appear, or check statically
+        await triggerGeneration(page);
         const collapsibleTrigger = page.locator("text=Pipeline Trace").first();
+        await expect(collapsibleTrigger).toBeVisible({ timeout: 5000 });
 
-        // If the panel isn't visible (no active generation), skip
-        const isVisible = await collapsibleTrigger.isVisible().catch(() => false);
-        if (!isVisible) {
-            test.skip();
-            return;
-        }
-
-        // Click to collapse
         await collapsibleTrigger.click();
-        // The content area should collapse
-        const content = page.locator("[data-state='closed']").first();
+        const content = page.getByTestId("pipeline-trace-collapsible").locator("[data-state='closed']").first();
         await expect(content).toBeVisible({ timeout: 2000 });
 
-        // Click to expand
         await collapsibleTrigger.click();
-        await expect(page.locator("[data-state='open']").first()).toBeVisible({ timeout: 2000 });
+        await expect(page.getByTestId("pipeline-trace-collapsible").locator("[data-state='open']").first()).toBeVisible({ timeout: 2000 });
     });
 
     test("color-coded event badges display correctly", async ({ page }) => {
-        // Verify the EVENT_CONFIG mapping has the correct badge labels
+        await triggerGeneration(page);
+
         const badgeLabels = [
-            "GENERATED",
-            "SCORED",
-            "REJECTED",
-            "REWRITTEN",
-            "SELECTED",
-            "GUARDRAIL",
-            "DEDUP",
-            "THUMBNAIL",
-            "PAIRWISE",
-            "SUMMARY",
-            "WARNING",
+            "GENERATED", "SCORED", "REJECTED", "REWRITTEN", "SELECTED",
+            "GUARDRAIL", "DEDUP", "THUMBNAIL", "PAIRWISE", "SUMMARY", "WARNING",
         ];
 
-        // Inject mock entries to render badges
-        await page.evaluate((entries) => {
-            entries.forEach((entry) => {
-                window.dispatchEvent(
-                    new CustomEvent("pipeline-trace-entry", { detail: entry })
-                );
-            });
-        }, MOCK_ENTRIES);
+        const badges = page.locator("[data-slot='badge']").filter({ hasText: /GENERATED|SCORED|REJECTED|REWRITTEN|SELECTED|GUARDRAIL/ });
+        await expect(badges.first()).toBeVisible({ timeout: 5000 });
 
-        // Check if any badges rendered (depends on whether the component listens to these events)
-        const badges = page.locator("[class*='badge']");
         const badgeCount = await badges.count();
+        expect(badgeCount).toBeGreaterThan(0);
 
-        if (badgeCount > 0) {
-            // Verify rendered badges match expected labels
-            const renderedTexts: string[] = [];
-            for (let i = 0; i < badgeCount; i++) {
-                const text = await badges.nth(i).textContent();
-                if (text) renderedTexts.push(text.trim());
-            }
-            // Each rendered badge text should be one of the known labels
-            for (const text of renderedTexts) {
-                if (badgeLabels.includes(text)) {
-                    expect(badgeLabels).toContain(text);
-                }
-            }
-        } else {
-            // No generation active — skip since badges only render with trace entries
-            test.skip();
+        const renderedTexts: string[] = [];
+        for (let i = 0; i < badgeCount; i++) {
+            const text = await badges.nth(i).textContent();
+            if (text) renderedTexts.push(text.trim());
+        }
+
+        for (const text of renderedTexts) {
+            expect(badgeLabels).toContain(text);
         }
     });
 
     test("LIVE indicator shows during generation", async ({ page }) => {
-        // The LIVE badge should appear when isRunning is true
+        // Because our mocked generation doesn't send "complete", it hangs in running state
+        await triggerGeneration(page);
         const liveIndicator = page.locator("text=LIVE").first();
-
-        // LIVE indicator only appears during active generation
-        const isVisible = await liveIndicator.isVisible().catch(() => false);
-        if (!isVisible) {
-            // LIVE only shows when pipeline is running — skip if no active generation
-            test.skip();
-            return;
-        }
-
-        // If visible, assert it properly
-        await expect(liveIndicator).toBeVisible();
+        await expect(liveIndicator).toBeVisible({ timeout: 5000 });
     });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -22,11 +22,17 @@ export function HumanFeedback({
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const isMounted = useRef(true);
 
     useEffect(() => {
+        if (initialRating !== undefined) setRating(initialRating);
+        if (initialNotes !== undefined) setNotes(initialNotes);
         if (initialRating || initialNotes) {
             setShowNotes(true);
         }
+        return () => {
+            isMounted.current = false;
+        };
     }, [initialRating, initialNotes]);
 
     if (!titleResultId) return null;
@@ -46,9 +52,13 @@ export function HumanFeedback({
                 }),
             });
             if (res.ok) {
-                setSaved(true);
-                setSaveError(null);
-                setTimeout(() => setSaved(false), 2000);
+                if (isMounted.current) {
+                    setSaved(true);
+                    setSaveError(null);
+                }
+                setTimeout(() => {
+                    if (isMounted.current) setSaved(false);
+                }, 2000);
             } else {
                 setSaveError("Failed to save rating");
             }

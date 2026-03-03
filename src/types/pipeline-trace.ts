@@ -12,6 +12,7 @@ export type PipelineEventType =
   | "pipeline_warning";
 
 export interface PipelineTraceEntry {
+  id?: string;
   timestamp: number;
   pass: string;
   event: PipelineEventType;

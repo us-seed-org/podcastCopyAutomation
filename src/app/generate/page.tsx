@@ -61,7 +61,7 @@ export default function GeneratePage() {
                     )}
 
                     {/* Pipeline Trace — visible during generation and collapsed after completion */}
-                    {state.traceEntries.length > 0 && (
+                    {state.traceEntries?.length > 0 && (
                         <PipelineTrace
                             entries={state.traceEntries}
                             isRunning={isRunning || isRegenerating}

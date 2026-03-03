@@ -213,18 +213,17 @@ export function PipelineTrace({ entries, isRunning }: PipelineTraceProps) {
 
     // Default open while running, collapse after
     useEffect(() => {
-        if (!isRunning && entries.length > 0) {
+        if (!isRunning) {
             setIsOpen(false);
-        }
-        if (isRunning) {
+        } else {
             setIsOpen(true);
         }
-    }, [isRunning, entries.length]);
+    }, [isRunning]);
 
-    if (entries.length === 0) return null;
+    if (!entries || entries.length === 0) return null;
 
     return (
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} data-testid="pipeline-trace-collapsible">
             <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
                 <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors">
@@ -261,7 +260,7 @@ export function PipelineTrace({ entries, isRunning }: PipelineTraceProps) {
                         <div ref={scrollRef} className="p-3 space-y-1.5 max-h-[400px] overflow-y-auto">
                             {entries.map((entry, idx) => (
                                 <TraceEntry
-                                    key={`${entry.timestamp}-${idx}`}
+                                    key={entry.id || `${entry.timestamp}-${idx}`}
                                     entry={entry}
                                     isExpanded={expandedIdx === idx}
                                     onToggle={() =>

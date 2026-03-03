@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Pipeline Trace SSE Events", () => {
+    test.setTimeout(300000); // 5 minutes because LLM generations take time
     test.skip(!process.env.ENABLE_API_TESTS, "Skipped: set ENABLE_API_TESTS=true to run");
 
     const SAMPLE_TRANSCRIPT = `
@@ -31,21 +32,23 @@ test.describe("Pipeline Trace SSE Events", () => {
     const SAMPLE_EPISODE_DESCRIPTION = "Jane Doe discusses her research into why 73% of startups fail due to lack of customer conversations, and shares a practical framework for pre-launch validation.";
 
     function parseSSEEvents(body: string) {
-        return body
-            .split("\n")
-            .filter((l) => l.startsWith("data: "))
-            .map((l) => {
-                try {
-                    return JSON.parse(l.slice(6));
-                } catch {
-                    return null;
-                }
-            })
-            .filter(Boolean);
+        const events: any[] = [];
+        const blocks = body.split(/\n\s*\n/);
+        for (const block of blocks) {
+            const dataLines = block.split("\n").filter(l => l.startsWith("data: "));
+            if (dataLines.length === 0) continue;
+            const payload = dataLines.map(l => l.slice(6)).join("\n");
+            try {
+                events.push(JSON.parse(payload));
+            } catch {
+                // ignore
+            }
+        }
+        return events.filter(Boolean);
     }
 
-    test("emits pipeline_trace events during generation", async ({ request }) => {
-        const res = await request.post("/api/generate", {
+    async function generateResponse(request: any) {
+        return await request.post("/api/generate", {
             data: {
                 research: SAMPLE_RESEARCH,
                 transcript: SAMPLE_TRANSCRIPT,
@@ -53,7 +56,10 @@ test.describe("Pipeline Trace SSE Events", () => {
             },
             timeout: 300_000,
         });
+    }
 
+    test("emits pipeline_trace events during generation", async ({ request }) => {
+        const res = await generateResponse(request);
         expect(res.status()).toBe(200);
 
         const body = await res.text();
@@ -77,14 +83,8 @@ test.describe("Pipeline Trace SSE Events", () => {
     });
 
     test("emits pipeline_summary before complete event", async ({ request }) => {
-        const res = await request.post("/api/generate", {
-            data: {
-                research: SAMPLE_RESEARCH,
-                transcript: SAMPLE_TRANSCRIPT,
-                episodeDescription: SAMPLE_EPISODE_DESCRIPTION,
-            },
-            timeout: 300_000,
-        });
+        const res = await generateResponse(request);
+        expect(res.status()).toBe(200);
 
         const body = await res.text();
         const events = parseSSEEvents(body);
@@ -111,14 +111,8 @@ test.describe("Pipeline Trace SSE Events", () => {
     });
 
     test("trace events include score dimensions for scored titles", async ({ request }) => {
-        const res = await request.post("/api/generate", {
-            data: {
-                research: SAMPLE_RESEARCH,
-                transcript: SAMPLE_TRANSCRIPT,
-                episodeDescription: SAMPLE_EPISODE_DESCRIPTION,
-            },
-            timeout: 300_000,
-        });
+        const res = await generateResponse(request);
+        expect(res.status()).toBe(200);
 
         const body = await res.text();
         const events = parseSSEEvents(body);
