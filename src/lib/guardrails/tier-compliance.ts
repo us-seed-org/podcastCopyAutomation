@@ -24,6 +24,26 @@ export function checkTierCompliance(
   for (const title of youtubeTitles) {
     const titleLower = title.toLowerCase();
 
+    if (tier === 0) {
+      // Tier 0: Same as Tier 3 — NO guest name or credential in YouTube titles
+      const mentionsName = nameParts.some((part) => titleLower.includes(part));
+      if (mentionsName) {
+        violations.push(
+          `Tier 0 violation: YouTube title "${title}" mentions guest name "${guestName}" — must be topic-only`
+        );
+      }
+      if (credentialLower && credentialParts) {
+        const mentionsCredential = credentialParts.some(
+          (part) => titleLower.includes(part)
+        );
+        if (mentionsCredential) {
+          violations.push(
+            `Tier 0 violation: YouTube title "${title}" mentions guest credential "${credential}" — must be topic-only`
+          );
+        }
+      }
+    }
+
     if (tier === 3) {
       // Tier 3: NO guest name or credential in YouTube titles
       const mentionsName = nameParts.some((part) => titleLower.includes(part));

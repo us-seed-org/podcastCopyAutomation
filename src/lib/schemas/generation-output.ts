@@ -21,6 +21,20 @@ export const thumbnailTextScoreSchema = z.object({
   total: z.number().min(0).max(100),
 });
 
+export const titleArchetypeSchema = z.enum([
+  "authority_shocking",
+  "mechanism_outcome",
+  "curiosity_gap",
+  "negative_contrarian",
+]);
+
+export const thumbnailArchetypeSchema = z.enum([
+  "gut_punch",
+  "label",
+  "alarm",
+  "confrontation",
+]);
+
 export const titleOptionSchema = z.object({
   title: z.string(),
   score: scoreBreakdownSchema,
@@ -29,6 +43,8 @@ export const titleOptionSchema = z.object({
   platformNotes: z.string(),
   thumbnailText: z.string().optional(),
   thumbnailTextScore: thumbnailTextScoreSchema.optional(),
+  archetype: titleArchetypeSchema.optional(),
+  thumbnailArchetype: thumbnailArchetypeSchema.optional(),
 }).refine(
   (data) => (data.thumbnailText == null) === (data.thumbnailTextScore == null),
   { message: "thumbnailText and thumbnailTextScore must both be present or both be absent" },
@@ -40,13 +56,13 @@ export const rejectedTitleSchema = z.object({
 });
 
 export const tierClassificationSchema = z.object({
-  tier: z.number().int().min(1).max(3),
+  tier: z.number().int().min(0).max(3),
   appliedCorrectly: z.boolean(),
   verification: z.string(),
 });
 
 export const generationOutputSchema = z.object({
-  youtubeTitles: z.array(titleOptionSchema).length(2),
+  youtubeTitles: z.array(titleOptionSchema).min(4).max(4),
   spotifyTitles: z.array(titleOptionSchema).length(2),
   rejectedTitles: z.array(rejectedTitleSchema).min(1),
   tierClassification: tierClassificationSchema.optional(),

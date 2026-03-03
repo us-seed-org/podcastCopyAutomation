@@ -8,7 +8,28 @@ import { ScoreBreakdownChart } from "@/components/score-breakdown";
 import { ThumbnailTextScoreChart } from "@/components/thumbnail-text-score";
 import { CopyButton } from "@/components/copy-button";
 import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon } from "lucide-react";
-import type { TitleOption } from "@/types/generation";
+import type { TitleOption, TitleArchetype, ThumbnailArchetype } from "@/types/generation";
+
+const archetypeLabels: Record<TitleArchetype, string> = {
+  authority_shocking: "Authority + Shocking",
+  mechanism_outcome: "Mechanism + Outcome",
+  curiosity_gap: "Curiosity Gap",
+  negative_contrarian: "Negative Contrarian",
+};
+
+const thumbArchetypeLabels: Record<ThumbnailArchetype, string> = {
+  gut_punch: "Gut Punch",
+  label: "Label",
+  alarm: "Alarm",
+  confrontation: "Confrontation",
+};
+
+const thumbArchetypeColors: Record<ThumbnailArchetype, string> = {
+  gut_punch: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  label: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+  alarm: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+  confrontation: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+};
 
 interface TitleCardProps {
   title: TitleOption;
@@ -54,6 +75,22 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
           </div>
           <ScoreBadge score={title.score.total} />
         </div>
+
+        {/* Archetype Badges */}
+        {(title.archetype || title.thumbnailArchetype) && (
+          <div className="flex items-center gap-1.5 mb-3">
+            {title.archetype && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                {archetypeLabels[title.archetype]}
+              </span>
+            )}
+            {title.thumbnailArchetype && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${thumbArchetypeColors[title.thumbnailArchetype]}`}>
+                {thumbArchetypeLabels[title.thumbnailArchetype]}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Thumbnail Text — YouTube only */}
         {platform === "youtube" && title.thumbnailText && (

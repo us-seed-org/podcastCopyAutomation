@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TitleCard } from "@/components/title-card";
+import { ScoreComparison } from "@/components/score-comparison";
 import { CopyButton } from "@/components/copy-button";
 import { ScoreBadge } from "@/components/score-badge";
 import { RefreshCw, Youtube, Headphones, FileText, ListOrdered, Copy, Check } from "lucide-react";
@@ -72,6 +73,11 @@ export function ResultsDashboard({ data, onRegenerate, isRegenerating }: Results
                             <TitleCard key={i} title={title} platform="youtube" index={i} />
                         ))}
                     </div>
+                    {data.youtubeTitles.length >= 2 && (
+                        <div className="mt-4">
+                            <ScoreComparison titles={data.youtubeTitles} platform="youtube" />
+                        </div>
+                    )}
                 </div>
 
                 <Separator className="bg-border/50" />

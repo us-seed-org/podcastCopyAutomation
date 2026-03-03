@@ -185,7 +185,7 @@ on these 4 dimensions (total /100):
 | Curiosity Gap | /25 | Does it open a SPECIFIC loop only clicking closes? "STOP" alone = max 15. "STOP EATING THIS" = 20+. Must create genuine "wait, what?" |
 | Emotional Punch | /25 | Gut reaction in 1-5 words? Does it match an expressive face OR act as a mind-bending thesis? Anger/fear/shock/conceptual-shift = 20+. Merely "interesting" = max 10. |
 | Title Complement | /25 | Does it add NEW information the title doesn't contain? If ANY word or phrase from the title appears in the thumbnail text, max 5. Perfect complement = 25. |
-| Brevity & Clarity | /25 | 2 words = 25. 3 words = 23. 4 words = 18. 5 words = 13. 6+ words = 0. Would you read it at phone-thumbnail size? |
+| Brevity & Clarity | /25 | 2 words = 25. 3 words = 23. 4 words = 12. 5+ words = 0. Would you read it at phone-thumbnail size? |
 
 ### Thumbnail Text Calibration
 
@@ -203,7 +203,7 @@ on these 4 dimensions (total /100):
 
 | Condition | Max Score |
 |-----------|-----------|
-| 6+ words | brevityAndClarity = 0 |
+| 5+ words | brevityAndClarity = 0 |
 | Any word from the title appears in thumbnail text | titleComplement max 5 |
 | Emotional reaction is merely "interesting" not visceral | emotionalPunch max 10 (exception: conceptual reframes score high on intellectual intrigue) |
 | Generic single word ("WARNING", "TRUTH", "NEWS") with no specificity and no conceptual reframe | curiosityGap max 12 |

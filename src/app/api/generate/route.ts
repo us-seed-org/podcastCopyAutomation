@@ -12,6 +12,10 @@ import {
   buildDescriptionChapterSystemPrompt,
   buildDescriptionChapterUserPrompt,
 } from "@/lib/prompts/description-chapter-system";
+import {
+  buildThumbnailRefinementSystemPrompt,
+  buildThumbnailRefinementUserPrompt,
+} from "@/lib/prompts/thumbnail-refinement-system";
 import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
 import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
 import { descriptionChapterOutputSchema } from "@/lib/schemas/description-chapter-output";
@@ -39,6 +43,51 @@ function normalizeTitle(title: string): string {
   return title.toLowerCase().trim();
 }
 
+const ALL_TITLE_ARCHETYPES: TitleArchetype[] = ["authority_shocking", "mechanism_outcome", "curiosity_gap", "negative_contrarian"];
+const ALL_THUMBNAIL_ARCHETYPES: ThumbnailArchetype[] = ["gut_punch", "label", "alarm", "confrontation"];
+
+/**
+ * Select 4 YouTube titles ensuring archetype diversity.
+ * Pick the best title from EACH archetype, then fill gaps from remaining pool.
+ */
+function selectWithArchetypeDiversity(titles: YouTubeTitleItem[]): YouTubeTitleItem[] {
+  const selected: YouTubeTitleItem[] = [];
+  const usedArchetypes = new Set<string>();
+  const usedThumbArchetypes = new Set<string>();
+  const usedTitles = new Set<string>();
+
+  // Pass 1: Pick best title from each title archetype
+  for (const arch of ALL_TITLE_ARCHETYPES) {
+    const candidates = titles.filter(
+      t => t.archetype === arch && !usedTitles.has(normalizeTitle(t.title))
+    );
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => (b.score?.total || 0) - (a.score?.total || 0));
+      const best = candidates[0];
+      selected.push(best);
+      usedTitles.add(normalizeTitle(best.title));
+      usedArchetypes.add(arch);
+      if (best.thumbnailArchetype) usedThumbArchetypes.add(best.thumbnailArchetype);
+    }
+  }
+
+  // Pass 2: Fill remaining slots from highest-scoring unused titles
+  if (selected.length < TARGET_YOUTUBE_COUNT) {
+    const remaining = titles
+      .filter(t => !usedTitles.has(normalizeTitle(t.title)))
+      .sort((a, b) => (b.score?.total || 0) - (a.score?.total || 0));
+
+    for (const t of remaining) {
+      if (selected.length >= TARGET_YOUTUBE_COUNT) break;
+      // Prefer titles that add a missing archetype
+      selected.push(t);
+      usedTitles.add(normalizeTitle(t.title));
+    }
+  }
+
+  return selected.slice(0, TARGET_YOUTUBE_COUNT);
+}
+
 interface ScoreBreakdown {
   curiosityGap: number;
   authoritySignal: number;
@@ -60,18 +109,23 @@ interface ThumbnailTextScore {
   total: number;
 }
 
+type TitleArchetype = "authority_shocking" | "mechanism_outcome" | "curiosity_gap" | "negative_contrarian";
+type ThumbnailArchetype = "gut_punch" | "label" | "alarm" | "confrontation";
+
 interface BaseTitleItem {
   title: string;
   score?: ScoreBreakdown;
   scrollStopReason?: string;
   emotionalTrigger?: string;
   platformNotes?: string;
+  archetype?: TitleArchetype;
   sourceModel?: string;
 }
 
 interface YouTubeTitleItem extends BaseTitleItem {
   thumbnailText?: string;
   thumbnailTextScore?: ThumbnailTextScore;
+  thumbnailArchetype?: ThumbnailArchetype;
   pairwiseWins?: number;
   pairwiseRank?: number;
 }
@@ -225,6 +279,26 @@ async function generateWithModel(
     }
   }
   return null;
+}
+
+// Fetch relevant benchmarks from Supabase for scoring calibration
+async function fetchBenchmarks(limit = 5): Promise<string> {
+  if (!supabase) return "";
+  try {
+    const { data: titles } = await supabase
+      .from("benchmark_titles")
+      .select("text, score, content_type, archetype, emotional_trigger, source_channel")
+      .order("score", { ascending: false })
+      .limit(limit);
+
+    if (!titles || titles.length === 0) return "";
+
+    return `\n## BENCHMARK CALIBRATION ANCHORS (from database)\n${titles.map(
+      (t: any) => `- "${t.text}" (${t.content_type}, score: ${t.score}, ${t.archetype || "no archetype"}, ${t.source_channel || "unknown channel"})`
+    ).join("\n")}\n\nStep 0: Before scoring any title, compare it against these benchmarks. Find the benchmark closest in quality and energy, and use its score as your anchor.`;
+  } catch {
+    return "";
+  }
 }
 
 // Dual-scorer panel: scores with both GPT-5.2 and Gemini, returns mean of dimension scores
@@ -537,6 +611,8 @@ export async function POST(request: Request) {
             youtubeAnalysis: ytStr,
             transcript,
             episodeDescription,
+            conceptualReframe: researchObj?.transcript?.conceptualReframe || null,
+            hotTakeTemperature: researchObj?.transcript?.hotTakeTemperature || undefined,
           });
 
           sendSSE(controller, encoder, {
@@ -676,7 +752,8 @@ export async function POST(request: Request) {
             message: `Scoring ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles with ${scorerNames}...`,
           });
 
-          const scoringPrompt = buildScoringSystemPrompt();
+          const benchmarkAnchors = await fetchBenchmarks(5);
+          const scoringPrompt = buildScoringSystemPrompt() + benchmarkAnchors;
           const titlesToScore = {
             youtubeTitles: allYoutubeTitles.map((t: any) => ({
               title: t.title,
@@ -754,6 +831,92 @@ export async function POST(request: Request) {
                   };
                 }
                 return t;
+              });
+            }
+          }
+
+          // === PASS 2.75: Thumbnail Text Refinement ===
+          const THUMB_REFINEMENT_THRESHOLD = 75;
+          const weakThumbTitles = allYoutubeTitles
+            .filter((t) => (t.thumbnailTextScore?.total || 0) < THUMB_REFINEMENT_THRESHOLD)
+            .slice(0, 4);
+
+          if (weakThumbTitles.length > 0) {
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Refining ${weakThumbTitles.length} weak thumbnail text(s) (score < ${THUMB_REFINEMENT_THRESHOLD})...`,
+            });
+
+            const conceptualReframe = researchObj?.transcript?.conceptualReframe || null;
+            const hotTakeTemperature = researchObj?.transcript?.hotTakeTemperature || "warm";
+
+            try {
+              const thumbRefineModel = geminiGenerationModel ?? generationModel;
+              const thumbRefineCtrl = new AbortController();
+              const thumbRefineTimeout = setTimeout(() => thumbRefineCtrl.abort(), 30_000);
+
+              const thumbResult = await generateText({
+                model: thumbRefineModel,
+                system: buildThumbnailRefinementSystemPrompt(),
+                prompt: buildThumbnailRefinementUserPrompt({
+                  titles: weakThumbTitles.map((t) => ({
+                    title: t.title,
+                    thumbnailText: t.thumbnailText || "",
+                    thumbnailTextScore: t.thumbnailTextScore?.total || 0,
+                  })),
+                  episodeDescription,
+                  conceptualReframe,
+                  hotTakeTemperature,
+                }),
+                abortSignal: thumbRefineCtrl.signal,
+              });
+              clearTimeout(thumbRefineTimeout);
+
+              const thumbJson = extractFirstJson(thumbResult.text);
+              if (thumbJson) {
+                const parsed = JSON.parse(thumbJson);
+                const refinements: Array<{
+                  originalTitle: string;
+                  bestAlternative: string;
+                  bestScore: { total: number };
+                }> = parsed.refinements || [];
+
+                let replacedCount = 0;
+                for (const ref of refinements) {
+                  if (!ref.bestAlternative || !ref.bestScore?.total) continue;
+                  const normalizedRefTitle = normalizeTitle(ref.originalTitle);
+                  const idx = allYoutubeTitles.findIndex(
+                    (t) => normalizeTitle(t.title) === normalizedRefTitle
+                  );
+                  if (idx === -1) continue;
+                  const oldScore = allYoutubeTitles[idx].thumbnailTextScore?.total || 0;
+                  if (ref.bestScore.total > oldScore) {
+                    allYoutubeTitles[idx] = {
+                      ...allYoutubeTitles[idx],
+                      thumbnailText: ref.bestAlternative,
+                      thumbnailTextScore: ref.bestScore as any,
+                    };
+                    replacedCount++;
+                  }
+                }
+
+                if (replacedCount > 0) {
+                  sendSSE(controller, encoder, {
+                    type: "status",
+                    message: `Replaced ${replacedCount} thumbnail text(s) with higher-scoring alternatives.`,
+                  });
+                } else {
+                  sendSSE(controller, encoder, {
+                    type: "status",
+                    message: "Thumbnail refinement produced no improvements — keeping originals.",
+                  });
+                }
+              }
+            } catch (thumbErr) {
+              console.warn("[PASS 2.75] Thumbnail refinement failed:", thumbErr);
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: "Thumbnail refinement failed — keeping original thumbnail text.",
               });
             }
           }
@@ -841,10 +1004,15 @@ export async function POST(request: Request) {
             (a, b) => (b.score?.total || 0) - (a.score?.total || 0)
           );
 
-          const selectedYoutube = allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
+          // Use archetype diversity selection for YouTube titles
+          const hasArchetypeData = allYoutubeTitles.some((t: any) => t.archetype);
+          const selectedYoutube = hasArchetypeData
+            ? selectWithArchetypeDiversity(allYoutubeTitles)
+            : allYoutubeTitles.slice(0, TARGET_YOUTUBE_COUNT);
           const selectedSpotify = allSpotifyTitles.slice(0, TARGET_SPOTIFY_COUNT);
 
-          const eliminatedYT = allYoutubeTitles.slice(TARGET_YOUTUBE_COUNT);
+          const selectedYTSet = new Set(selectedYoutube.map(t => normalizeTitle(t.title)));
+          const eliminatedYT = allYoutubeTitles.filter(t => !selectedYTSet.has(normalizeTitle(t.title)));
           const eliminatedSP = allSpotifyTitles.slice(TARGET_SPOTIFY_COUNT);
           for (const t of eliminatedYT) {
             const safeScore = t.score?.total ?? 'N/A';

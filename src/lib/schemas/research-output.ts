@@ -17,10 +17,13 @@ export const hotTakeSchema = z.object({
     "debunking",
     "provocative_opinion",
   ]),
+  heatScore: z.number().min(1).max(5).describe("How likely to start an argument at a dinner party (1-5)"),
+  viewerStakes: z.string().describe("One sentence explaining why this personally affects the VIEWER"),
+  sharpenedVersion: z.string().describe("The same claim escalated to heat level 4+"),
 });
 
 export const guestTierSchema = z.object({
-  tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  tier: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
   reasoning: z.string(),
   youtubeRecommendation: z.string(),
 });
@@ -43,10 +46,13 @@ export const researchOutputSchema = z.object({
   }),
   transcript: z.object({
     hotTakes: z.array(hotTakeSchema).min(1).max(5).describe("Up to 5 most clickable hot takes from the transcript"),
+    hotTakeTemperature: z.enum(["hot", "warm", "cold"]).describe("hot = 2+ takes scored 4+, warm = 1 take scored 4+, cold = no takes scored 4+"),
+    conceptualReframe: z.string().nullable().describe("2-5 word bumper sticker distilling the episode's core thesis, or null"),
     topClaims: z.array(z.string()),
     specificNumbers: z.array(z.string()),
     emotionalMoments: z.array(z.string()),
     clickableMoment: z.string(),
+    competitiveLandscape: z.string().optional().describe("What similar episodes from other podcasts are doing"),
     topicSegments: z.array(topicSegmentSchema),
     trendingKeywords: z.array(z.string()),
   }),

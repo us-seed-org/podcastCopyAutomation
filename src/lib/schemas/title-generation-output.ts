@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema } from "./generation-output";
+import { scoreBreakdownSchema, thumbnailTextScoreSchema, rejectedTitleSchema, titleArchetypeSchema, thumbnailArchetypeSchema } from "./generation-output";
 
 const generatedBaseTitleSchema = z.object({
   title: z.string(),
@@ -7,11 +7,13 @@ const generatedBaseTitleSchema = z.object({
   scrollStopReason: z.string(),
   emotionalTrigger: z.string(),
   platformNotes: z.string(),
+  archetype: titleArchetypeSchema.optional(),
 });
 
 export const generatedYouTubeTitleSchema = generatedBaseTitleSchema.extend({
   thumbnailText: z.string(),
   thumbnailTextScore: thumbnailTextScoreSchema,
+  thumbnailArchetype: thumbnailArchetypeSchema.optional(),
 });
 
 export const generatedSpotifyTitleSchema = generatedBaseTitleSchema;

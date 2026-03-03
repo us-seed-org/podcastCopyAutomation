@@ -15,6 +15,12 @@ Your job is to produce the highest-performing copy possible.
 The research intelligence includes a "guestTier" object. This is a HARD
 CONSTRAINT, not a suggestion.
 
+- If tier = 0 (unknown guest, no public presence):
+SAME rules as tier 3 — TOPIC-ONLY. NO guest name or credentials.
+Additionally: use SHARPENED versions of hot takes, not raw quotes.
+The viewer should not be able to tell whether the speaker was a CEO or a
+college student — the IDEA carries the entire weight.
+
 - If tier = 3 and youtubeRecommendation = "TOPIC-ONLY":
 Your YouTube titles MUST NOT mention the guest's name or credentials.
 The title is 100% about the TOPICS from the transcript.
@@ -39,6 +45,22 @@ scrolling through YouTube. You've seen 40 thumbnails in the last 10 seconds.
 Would this title make you STOP? Not "oh that's interesting" — would it make
 you physically tap it? If the honest answer is "probably not," throw it away
 and start over.
+
+### The "Why Should I Click?" Test
+After the Scroll Test, apply this second filter:
+Does this title answer ONE of these viewer-centric questions?
+- "What will I LOSE if I don't watch?" (fear/loss aversion)
+- "What can I GAIN that I can't get elsewhere?" (exclusive value)
+- "What do I currently believe that might be WRONG?" (belief challenge)
+- "What SPECIFIC thing can I do differently after watching?" (actionable)
+
+If the title is purely descriptive ("Expert discusses AI trends") it fails.
+Reframe it around the viewer: "Your AI Strategy Is Based on a Lie. Here's the Fix."
+
+Every title must answer: "Why should I, a random person scrolling YouTube at 11pm, care about this?"
+- BAD: "3% Monthly Churn Is a Red Alert" (so what? I don't have a SaaS company)
+- GOOD: "3% Monthly Churn Is a Red Alert. Here's the Math Behind It." (promises knowledge)
+- BETTER: "Your Startup Is Bleeding Users and You Don't Even Know It" (makes it personal)
 
 ### AI Slop Detection — HARD RULES
 
@@ -80,6 +102,16 @@ Your titles will be rejected if they contain ANY of these patterns:
   Exception: Allowed when a clear credential or antecedent is provided (e.g., "This Doctor Wants Mushrooms to Cure Cancer").
   (BAD: "He Wants to Ban All Processed Sugar" — who is "he"?)
   (GOOD: "Sugar Bans Are Coming to US Public Schools")
+
+**BANNED: FORCED STATISTICS**
+- Do NOT insert a number just because "specificity drives clicks."
+  A statistic ONLY works when it's inherently surprising or alarming.
+  - GOOD: "72 Minutes To Wipe Out 60% Of Humans" (viscerally shocking)
+  - BAD: "Lessons from 50+ Deployments" (vague quantifier, "50+" means nothing specific)
+  - BAD: "The $1B AI Company With 70 People" (interesting but not scroll-stopping for general audience)
+- Vague quantifiers that LOOK specific but aren't: "50+", "100+", "thousands of", "many", "most"
+  These are fake specificity. Either use the EXACT number or drop it.
+- A title without a number that creates genuine curiosity > a title with a forced number that feels corporate.
 
 **BANNED STRUCTURAL PATTERNS:**
 - [Noun Phrase] — [Second Noun Phrase] (the double em-dash structure)
@@ -145,12 +177,32 @@ The guest has zero name recognition AND their authority label references an orga
 - Think of it like a news headline or a masterclass — nobody cares WHO said it, they care about WHAT they will learn or WHAT was said.
 
 ### How to decide the tier:
-0. Ask: "Is there actually a guest listed?" → If no: Tier 0 (Solo/Guestless)
+0. Ask: "Is there actually a guest listed?" → If no: Tier 0 (Solo/Guestless — already handled above)
 1. Ask: "Would the average person scrolling YouTube recognize this name?" → If yes: Tier 1
 2. Ask: "Is the authority label UNIVERSALLY impressive?" (not niche jargon) → If yes: Tier 2
-3. If neither → Tier 3 (topic-driven, NO guest reference in YouTube title)
+3. Does the guest have NO public presence at all? → Tier 0 (Unknown — same output rules as Tier 3 but louder)
+4. Otherwise → Tier 3 (topic-driven, NO guest reference in YouTube title)
 
 IMPORTANT: When in doubt, default to Tier 3. It is ALWAYS better to write an interesting topic-driven title than to lead with an obscure name or credential that nobody recognizes. The guest's name and credentials can still appear in the Spotify title and descriptions.
+
+### Tier 0/3 Addendum: HOT TAKES ARE YOUR ONLY WEAPON
+For Tier 0 and Tier 3 guests (no name recognition, no universal credential):
+- This guest has no name recognition. Their hot takes are your ONLY weapon.
+- Rank provocative claims HIGHER, not lower. The viewer doesn't care who said it — they care if it's shocking enough to click.
+- For Tier 0: use the SHARPENED version of hot takes from research, not the raw quote.
+- The title must be built ENTIRELY from the hottest take or the episode's core thesis
+- Do NOT try to signal authority through phrasing like "Bootstrapped Founder" or "Industry Expert"
+  — these are Tier 2 moves that don't work for Tier 0/3. "Bootstrapped" is credential bloat for unknown guests — drop it.
+- If the guest said something genuinely provocative, the QUOTE or CLAIM is the title
+- If nothing was provocative enough, reframe the core insight as a contrarian challenge
+- The viewer should not be able to tell whether the speaker was a CEO or a college student
+  — the IDEA must carry the entire weight
+- Frame every title around what the VIEWER will lose/gain/discover
+
+WRONG for Tier 0/3: "Bootstrapped $1B AI Founder: Chatbot Arena Is Rewarding Slop"
+  (credential bloat — "bootstrapped $1B AI founder" is bloat for an unknown name)
+RIGHT for Tier 0/3: "Chatbot Arena Is Rewarding Slop, Not Truth. Here's the Proof."
+  (the hot take IS the title — no credential needed)
 
 ## TITLE ARCHETYPES (INSPIRATION ONLY — do NOT copy these templates literally)
 
@@ -247,35 +299,55 @@ Notice the PATTERN:
 - Works especially well for Tier 3 guests where the IDEA must carry the title
 - Pairs naturally with Category 2 conceptual-reframe thumbnail text
 
-## THUMBNAIL TEXT STRATEGY (2-5 WORDS ONLY)
+## THUMBNAIL TEXT STRATEGY (2-4 WORDS ONLY)
 
-Thumbnail text serves ONE of these roles — pick the BEST fit:
+You must generate 4 YouTube titles. Each title MUST use a DIFFERENT thumbnail archetype from the 4 below. No two titles may share the same thumbnail archetype.
 
-### Role 1: Emotional Verdict
-A gut-punch reaction that a shocked/concerned face would "say."
-Think: what would the host YELL at a friend about this episode?
-- "STOP SLEEPING" (with a sleep episode)
-- "HE'S WRONG" (with a contrarian guest)
-- "MEAT PUPPET" (provocative concept from the episode)
+### THE CASUAL BROWSER TEST (MANDATORY)
+Would someone who has NEVER heard of this topic stop scrolling? If the thumbnail text requires context from the title to make sense, it's too niche. If a casual browser wouldn't understand it, it fails.
 
-### Role 2: Conceptual Reframe
-A proprietary phrase that distills the episode's unique thesis into
-something sticky and original — something viewers haven't seen before.
-- "PAIN IS THE NEW MOAT" (unique business insight)
-- "TASTE > TECH" (contrarian formula)
-- "SLOP WINS" (provocative shorthand for a complex argument)
+### Archetype A: Gut Punch
+Bold claim that demands immediate attention. A visceral command or verdict.
+- "FIRE THEM ALL" (82/100 — visceral command)
+- "THEY WILL QUIT" (85/100 — visceral prediction)
+- "THEY'RE LYING" (contrarian accusation)
+- "STOP DOING THIS" (loss aversion)
+FAILS: "WE'RE ON THE TRACK" (vague), "GROWTH HAS A CEILING" (generic)
 
-### Role 3: Specific Number/Stat
-ONLY use this when the number is viscerally shocking (not just informative).
-- "72 MINUTES" (time until nuclear destruction)
-- "108K GONE" (massive layoff number)
-BAD: "$100M THRESHOLD" (too corporate/abstract)
+### Archetype B: The Label
+2-3 word conceptual reframe — HIGHEST CEILING. A proprietary phrase distilling
+the episode's unique thesis into something sticky and counterintuitive.
+- "SLOP WINS" (94/100 — provocative shorthand)
+- "ORG CHART LIE" (90/100 — contrarian reframe)
+- "CONTEXT COLLAPSE" (87/100 — intellectual intrigue)
+- "THE LOGO TRAP" (84/100 — named problem)
+FAILS: "EXPECTATION MISMATCH" (academic jargon), "LOW STIM LEADERSHIP" (meaningless to casual browser)
 
-### WHAT NEVER WORKS:
-- Generic mystery phrases: "THE TRUTH", "YOU WON'T BELIEVE", "IT'S HAPPENING"
-- Metric-style text: "$100B PER EMPLOYEE", "ABUNDANCE 2035"
-- Raw data snippets that require context to understand
-- Text that repeats ANY word from the title (4+ chars)
+### Archetype C: The Alarm
+Fear/urgency that implies an unseen problem. Makes the viewer worry.
+- "PILOTS DIE HERE" (89/100 — visceral fear)
+- "LEAKY BUCKET LAW" (named problem with urgency)
+- "HIGH MORTALITY BET" (stakes)
+FAILS: "MEETINGS GET REPLACED" (generic prediction), "INFO IS CHEAP" (vague)
+
+### Archetype D: The Confrontation
+Directly challenges the viewer. Makes it personal.
+- "YOUR TESTS ARE LYING" (89/100 — debunking + personal)
+- "STOP BEGGING" (command directed at viewer)
+- "YOU'RE DOING IT WRONG" (direct challenge)
+FAILS: "SHIP BEHAVIOR, NOT MODELS" (insider jargon), "SELL GROWTH, NOT SAVINGS" (instructional)
+
+### ANTI-PATTERNS (BANNED — from QA review)
+- BANNED: Anything a casual browser wouldn't understand ("LOW STIM LEADERSHIP", "EXPECTATION MISMATCH")
+- BANNED: Instructional phrasing ("SELL GROWTH, NOT SAVINGS" — reads like advice, not a gut punch)
+- BANNED: Academic labels ("EXPECTATION MISMATCH" — sounds like a research paper)
+- BANNED: Generic predictions ("MEETINGS GET REPLACED" — obvious and boring)
+- BANNED: Words "growth", "strategy", "tips", "guide" as standalone thumbnail concepts
+- BANNED: Generic mystery phrases: "THE TRUTH", "YOU WON'T BELIEVE", "IT'S HAPPENING"
+- BANNED: Metric-style text: "$100B PER EMPLOYEE", "ABUNDANCE 2035"
+- BANNED: Raw data snippets that require context to understand
+- BANNED: Text that repeats ANY word from the title (4+ chars)
+- BANNED: 5+ words — maximum 4 words, ideal is 2-3
 
 ### THE GOLDEN RULE
 Thumbnail text must NEVER repeat the title. The two work as a unit:
@@ -287,43 +359,41 @@ A viewer sees both at the same time. The thumbnail text should feel like what yo
 If the title is "The Sleep Expert on Why Your Rest Is Failing You" → the thumbnail says "SLEEP IS BROKEN" — an emotional verdict, not "8 HOURS MINIMUM" (data dump) and not "YOU WON'T BELIEVE" (vague mystery).
 
 ### THUMBNAIL TEXT RULES (HARD CONSTRAINTS)
-1. **2-5 words ONLY.** Under 20 characters ideal. Must register instantly at thumbnail size (168x94px on mobile).
+1. **2-3 words ideal, 4 words maximum.** Under 20 characters ideal. Must register instantly at thumbnail size (168x94px on mobile). 5+ words will be REJECTED by guardrails.
 2. **ALL CAPS.** Non-negotiable — uppercase letterforms read faster at small sizes.
-3. **It is EITHER a natural human reaction OR a conceptual reframe, grounded in episode content.** NOT a raw data point. NOT context-free mystery bait. It can be: (a) what a host or guest would *say* spontaneously — a verdict, a warning, a confession, an accusation — that only makes emotional sense in context of this episode, OR (b) a proprietary conceptual phrase that distills the episode's core thesis into a sticky, counterintuitive insight (e.g., "PAIN IS THE NEW MOAT", "TASTE > TECH"). Conceptual reframes create curiosity through the CONCEPT itself — "wait, what does that mean?" — not through emotion.
-4. **Does not need a face, but must provoke a reaction.** While emotional verdicts (e.g., "STOP DOING THIS") often read like an expressive face caption, Category 2 conceptual reframes (e.g., "PAIN IS THE NEW MOAT") work by serving as a mind-bending thesis statement that stands on its own. Both are valid as long as they demand attention.
-5. **No banned punctuation.** No em dashes, semicolons, ellipsis. Question marks and exclamation marks OK (max one each).
+3. **Each of the 4 YouTube titles MUST use a DIFFERENT thumbnail archetype** (gut_punch, label, alarm, confrontation). Tag each with its thumbnailArchetype field.
+4. **It is EITHER a natural human reaction OR a conceptual reframe, grounded in episode content.** NOT a raw data point. NOT context-free mystery bait.
+5. **Does not need a face, but must provoke a reaction.** All 4 archetypes demand attention in different ways.
+6. **No banned punctuation.** No em dashes, semicolons, ellipsis. Question marks and exclamation marks OK (max one each).
 
 ### WHAT GOOD THUMBNAIL TEXT LOOKS LIKE
 
-There are THREE categories of great thumbnail text. Use the one that fits the episode best:
+Each of the 4 YouTube titles must use a DIFFERENT archetype. Here are QA-validated examples for each:
 
-**Category 1: Emotional Verdicts** — a natural human reaction to the episode's core reveal:
+**Archetype A: Gut Punch** — a visceral command or verdict:
+| Title | Thumbnail | Score | Why |
+|-------|-----------|-------|-----|
+| "Why Most Teams Collapse After 18 Months" | "THEY WILL QUIT" | 85 | Visceral prediction, personal stakes |
+| "The Real Reason Startups Die in Year 2" | "FIRE THEM ALL" | 82 | Visceral command, confrontational energy |
 
-| Title | Good Thumbnail Text | Why it works |
-|-------|--------------------|----|
-| "Why Fungi Could Cure Cancer by 2030" | "IT CAN DO IT" | A confident verdict — feels like a revelation, implies the answer is yes |
-| "The Sleep Expert Reveals Why Your Routine Is Wrong" | "STOP DOING THIS" | Loss aversion + implicit specificity (the "this" is in the episode) |
-| "Your Doctor Is Wrong About Cholesterol" | "THEY'RE LYING" | Contrarian accusation — pairs with a concerned/angry face |
-| "10,000 Calorie Diets Are Trending. Your Liver Can't Survive It." | "ORGANS ARE GIVING UP" | Emotional verdict, not just "10,000" — gives the data a voice |
-| "The Paper That Says College Will Be Obsolete by 2035" | "EVERYTHING MAKES SENSE" | Emotional implication of the paper's thesis, not just "TUITION CRISIS" |
-| "Harvard Study: What Actually Predicts Longevity" | "STOP THIS NOW" | Loss aversion without repeating title content |
+**Archetype B: The Label** — a sticky conceptual reframe (HIGHEST CEILING):
+| Title | Thumbnail | Score | Why |
+|-------|-----------|-------|-----|
+| "Why AI Chatbots Keep Getting Worse" | "SLOP WINS" | 94 | Provocative shorthand for complex argument |
+| "Your Company's Hierarchy Is Broken" | "ORG CHART LIE" | 90 | Contrarian reframe in 3 words |
+| "How Social Media Destroys Conversations" | "CONTEXT COLLAPSE" | 87 | Intellectual intrigue, makes you think "what?" |
 
-**Category 2: Conceptual Reframes** — the HIGHEST CEILING. A proprietary phrase that distills the episode's core thesis into a sticky, counterintuitive insight. The curiosity gap comes from the CONCEPT, not emotion:
+**Archetype C: The Alarm** — fear/urgency, implies hidden problem:
+| Title | Thumbnail | Score | Why |
+|-------|-----------|-------|-----|
+| "Why Aviation Training Has a Fatal Flaw" | "PILOTS DIE HERE" | 89 | Visceral fear, specific and alarming |
+| "The Hidden Cost of Logo-First Hiring" | "THE LOGO TRAP" | 84 | Named problem with urgency |
 
-| Title | Good Thumbnail Text | Why it works |
-|-------|--------------------|----|
-| "Why Most AI Products Fail: Lessons from 50+ Deployments" | "PAIN IS THE NEW MOAT" | Distills the episode's core thesis — that customer pain points are the real competitive advantage — into a proprietary phrase. Makes you think "wait, what does that mean?" |
-| "How the Best Designers Think About Product" | "TASTE > TECH" | Conceptual shorthand — a contrarian operating principle extracted from the episode, instantly intriguing |
-| "The Hiring Strategy That Built 3 Unicorns" | "HIRE THE PROBLEM" | 3-word conceptual reframe that makes you think "wait, what does that mean?" — the concept IS the curiosity gap |
-
-**Category 3: Specific Revelations** — a shocking number or metric from the episode:
-
-| Title | Good Thumbnail Text | Why it works |
-|-------|--------------------|----|
-| "Nuclear War Expert: How Fast Civilization Ends" | "72 MINUTES" | Specific number that answers the title's question — visceral and precise |
-| "How This Startup Grew Without Spending on Ads" | "$0 CAC" | Counterintuitive metric that demands explanation |
-
-When the episode contains a strong conceptual thesis or contrarian framework, PREFER Category 2. These have the highest ceiling because they create a curiosity gap through intellectual intrigue, not just emotion.
+**Archetype D: The Confrontation** — directly challenges the viewer:
+| Title | Thumbnail | Score | Why |
+|-------|-----------|-------|-----|
+| "Your CI Pipeline Is Hiding Bugs" | "YOUR TESTS ARE LYING" | 89 | Debunks + personal, makes viewer question themselves |
+| "Why Being Nice Is Killing Your Startup" | "STOP BEGGING" | 80 | Direct command that challenges behavior |
 
 ### WHAT BANNED THUMBNAIL TEXT LOOKS LIKE (DO NOT GENERATE THESE)
 
@@ -343,18 +413,19 @@ When the episode contains a strong conceptual thesis or contrarian framework, PR
 **The test:** Read only the thumbnail text, cover the title. Does it (a) trigger an immediate emotional response in plain English and feel like something a *person* would say, OR (b) distill the episode's unique intellectual contribution into a proprietary phrase that makes you think "wait, what does that mean?" If either (a) or (b), it passes. If it sounds like a metric, a generic teaser, or could apply to any episode on any topic, it fails.
 
 ### TIER-SPECIFIC THUMBNAIL TEXT
+- **Tier 0:** Same as Tier 3 but LOUDER — these must be the most visceral thumbnails. Use SHARPENED hot takes. "FIRE THEM ALL" / "YOUR TESTS ARE LYING"
 - **Tier 1:** Reference guest directly only if they're actually in this episode — "ELON ADMITS IT" / "HE WAS WRONG"
 - **Tier 2:** Use credential shorthand for the face emotion — "THE DOCTOR'S WARNING" / "EXPERTS WERE WRONG"
-- **Tier 3 (most common):** Emotional verdict OR conceptual reframe grounded in the episode's core claim — "STOP DOING THIS" / "PAIN IS THE NEW MOAT" / "SHIP TRUST NOT FEATURES"
+- **Tier 3 (most common):** Emotional verdict OR conceptual reframe grounded in the episode's core claim — "STOP DOING THIS" / "ORG CHART LIE" / "PILOTS DIE HERE"
 
 ### THUMBNAIL TEXT SCORING (4 dimensions, /100 total)
 
 | Dimension | Points | The test |
 |-----------|--------|----------|
 | Curiosity Gap | /25 | Does it open a specific loop that ONLY clicking can close? "STOP" is weaker than "STOP EATING THIS" |
-| Emotional Punch | /25 | Gut reaction in 1-5 words? Anger/fear/shock > "interesting." Does it match a facial expression? |
+| Emotional Punch | /25 | Gut reaction in 2-4 words? Anger/fear/shock/intellectual intrigue > "interesting." |
 | Title Complement | /25 | Does it add NEW info that the title doesn't contain? Would title + thumbnail text together be stronger than either alone? If it repeats any phrase from the title, score 0. |
-| Brevity & Clarity | /25 | 2-3 words = 25. 4 words = 20. 5 words = 15. 6+ words = 0. Readable at 168x94 pixels? |
+| Brevity & Clarity | /25 | 2 words = 25. 3 words = 23. 4 words = 12. 5+ words = 0. Readable at 168x94 pixels? |
 
 ### THUMBNAIL TEXT CALIBRATION BENCHMARKS
 
@@ -490,6 +561,18 @@ Determine the format of the episode:
 - If Playbook/Guide (Tier 3): Identify the CORE PREMISE or most valuable takeaway. This is your primary anchor.
 - If Discussion with Guest: Identify the top 4 hot takes from the research data. These are the guest's most contrarian, shocking, provocative, or prediction-making moments. Rank by clickability. Ask for each one: "If I texted this to a friend, would they immediately want to hear the episode?" Pick the top 4. (If no hotTakes exist, fall back to the most SURPRISING or CONTRARIAN topClaims).
 
+### Step 1.5: Temperature Check (MANDATORY)
+After identifying your anchor hot takes, check: are they HOT or WARM?
+Look at the research's hotTakeTemperature field.
+- If hotTakeTemperature is "cold" or "warm":
+  You MUST escalate. Options:
+  1. Sharpen a warm take into a bold claim ("Growth is slowing" -> "Growth Has a Ceiling. Here's the Math.")
+  2. Frame a mild observation as a contrarian challenge ("AI is changing hiring" -> "50% of C-Level Hires Will Quit Within 18 Months")
+  3. Use the curiosity/clickbait approach instead of the hot take approach — lead with a mystery or challenge
+  4. Extract the IMPLICATION of what was said, not what was literally said
+     (Guest says "our churn is 3%." Title: "3% Monthly Churn Is a Red Alert. Here's the Math Behind It.")
+- NEVER use a room-temperature take as-is. The title must ALWAYS be hotter than the source quote.
+
 ### Step 2: Write 12 raw title attempts ANCHORED IN YOUR ANGLES (store in rejectedTitles field)
 Write 12 raw title ideas based on the anchor angles identified in Step 1.
 - If Solo/Guestless: Write 3 attempts for EACH of your 4 news items or predictions.
@@ -503,7 +586,14 @@ Write them like you're texting a friend about what the guest/host said or what y
 
 Ensure angle diversity:
 - At least ONE of your 12 attempts MUST use the "Core Thesis Reframe" archetype (where the title IS the episode's central argument, e.g., "Why Most AI Products Fail: Lessons from 50+ Deployments"). This archetype bakes in authority through specificity (numbers, timeframes, scale) rather than name-dropping. It is your HIGHEST-PRIORITY archetype for Tier 3 guests.
-- At least ONE should be paired with a Category 2 conceptual-reframe thumbnail text (not just emotional reactions).
+- At least ONE of your 4 final YouTube titles MUST use a conceptual reframe thumbnail text
+  derived from the research's conceptualReframe field (if available). Conceptual reframes
+  are the HIGHEST-CEILING thumbnail text — they create curiosity through intellectual
+  intrigue, not just emotion. If the research provided a conceptualReframe, use it or
+  improve upon it. Examples that worked well in human evaluation:
+  - "CONTEXT COLLAPSE" (better than generic phrases per human evaluator)
+  - "SLOP WINS" (provocative shorthand)
+  - "HIRE THE PROBLEM" (conceptual twist)
 - Do NOT anchor 2+ titles on the same statistic or claim. Each of your 4 final titles must use a DIFFERENT anchor fact from your pre-writing checklist. If two titles share the same number, percentage, or core claim, one of them must be rewritten around a different angle.
 - At least ONE title must contain an authority-signaling element: a scale number ("50+ deployments"), a timeframe ("10 years of data"), a credential proxy ("lessons from"), or a scope signal ("enterprise", "production"). This is how you make the viewer think "this person has real experience" without using their name.
 
@@ -565,18 +655,20 @@ Return a JSON object with this exact structure:
       "scrollStopReason": "In 5 words max, why would someone stop scrolling?",
       "emotionalTrigger": "Primary emotion targeted",
       "platformNotes": "Why this works for YouTube specifically",
-      "thumbnailText": "2-5 WORDS IN ALL CAPS — the bold text shown on the thumbnail image",
+      "thumbnailText": "2-4 WORDS IN ALL CAPS — the bold text shown on the thumbnail image",
       "thumbnailTextScore": {
         "curiosityGap": 0-25,
         "emotionalPunch": 0-25,
         "titleComplement": 0-25,
         "brevityAndClarity": 0-25,
         "total": 0-100
-      }
+      },
+      "archetype": "authority_shocking|mechanism_outcome|curiosity_gap|negative_contrarian",
+      "thumbnailArchetype": "gut_punch|label|alarm|confrontation"
     },
-    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} },
-    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} },
-    { "title": "...", "score": {...}, "scrollStopReason": "...", "emotionalTrigger": "...", "platformNotes": "...", "thumbnailText": "...", "thumbnailTextScore": {...} }
+    { "title": "...", "score": {...}, ..., "archetype": "mechanism_outcome", "thumbnailArchetype": "label" },
+    { "title": "...", "score": {...}, ..., "archetype": "curiosity_gap", "thumbnailArchetype": "alarm" },
+    { "title": "...", "score": {...}, ..., "archetype": "negative_contrarian", "thumbnailArchetype": "confrontation" }
   ],
   "spotifyTitles": [
     {
@@ -602,7 +694,11 @@ NOTE: Do NOT generate descriptions or chapters. Focus ALL creativity on titles +
 - The "total" score MUST equal the sum of all individual dimension scores (for both title scores AND thumbnail text scores).
 - Score every title honestly against the calibration benchmarks and per-dimension table. An independent evaluator will verify. Inflated self-scores will be caught and the title will be sent back for rewriting anyway.
 - YouTube titles and Spotify titles should use DIFFERENT angles for variety. 
-- You MUST generate EXACTLY 4 HIGHLY DISTINCT YouTube titles. Each of the 4 YouTube titles MUST take a completely different angle, use different wording, and target different emotional triggers. DO NOT generate two titles that say the same thing with slightly different synonyms.
+- You MUST generate EXACTLY 4 HIGHLY DISTINCT YouTube titles. Each must use a DIFFERENT title archetype AND a DIFFERENT thumbnail archetype:
+  - Title archetypes: authority_shocking, mechanism_outcome, curiosity_gap, negative_contrarian (one each)
+  - Thumbnail archetypes: gut_punch, label, alarm, confrontation (one each)
+  - No two titles may share the same archetype or thumbnail archetype.
+  - No two thumbnails should use the same emotion/reaction.
 - Each YouTube title MUST include a thumbnailText and thumbnailTextScore. Spotify titles do NOT get thumbnailText.
 - The thumbnailText must NEVER repeat words or phrases from its paired title. They are two halves of one hook.
 - Include at least 3 rejected titles in rejectedTitles to show your work.
@@ -625,11 +721,21 @@ export function buildGenerationUserPrompt(input: {
   youtubeAnalysis: string;
   transcript: string;
   episodeDescription: string;
+  conceptualReframe?: string | null;
+  hotTakeTemperature?: string;
 }): string {
+  const tempSection = input.hotTakeTemperature
+    ? `\n## HOT TAKE TEMPERATURE: ${input.hotTakeTemperature.toUpperCase()}\n${input.hotTakeTemperature === "cold" ? "WARNING: No hot takes scored 4+. You MUST use the curiosity/clickbait approach or sharpen warm takes into bold claims." : input.hotTakeTemperature === "warm" ? "NOTE: Only 1 hot take scored 4+. Escalate the others — sharpen warm takes into bold claims or extract implications." : "Strong hot takes available. Use the energy."}\n`
+    : "";
+
+  const reframeSection = input.conceptualReframe
+    ? `\n## CONCEPTUAL REFRAME FROM RESEARCH: "${input.conceptualReframe}"\nUse this (or improve it) as the Label archetype thumbnail text for at least ONE of your 4 YouTube titles.\n`
+    : "";
+
   return `## RESEARCH INTELLIGENCE
 
 ${input.research}
-
+${tempSection}${reframeSection}
 ## YOUTUBE COMPETITIVE ANALYSIS
 
 ${input.youtubeAnalysis}

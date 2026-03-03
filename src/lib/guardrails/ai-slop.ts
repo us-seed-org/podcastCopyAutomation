@@ -130,9 +130,9 @@ export function checkThumbnailText(
   for (const { thumbnailText, title } of thumbnailTexts) {
     const words = thumbnailText.trim().split(/\s+/);
 
-    if (words.length > 5) {
+    if (words.length > 4) {
       violations.push(
-        `Thumbnail text "${thumbnailText}" has ${words.length} words (max 5)`
+        `Thumbnail text "${thumbnailText}" has ${words.length} words (max 4)`
       );
     }
 

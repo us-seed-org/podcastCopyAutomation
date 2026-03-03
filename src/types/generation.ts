@@ -27,6 +27,8 @@ export interface TitleOption {
   platformNotes: string;
   thumbnailText?: string;
   thumbnailTextScore?: ThumbnailTextScore;
+  archetype?: TitleArchetype;
+  thumbnailArchetype?: ThumbnailArchetype;
   sourceModel?: string;
   pairwiseWins?: number;
   pairwiseRank?: number;
@@ -37,7 +39,10 @@ export interface RejectedTitle {
   rejectionReason: string;
 }
 
-export type Tier = 1 | 2 | 3;
+export type TitleArchetype = "authority_shocking" | "mechanism_outcome" | "curiosity_gap" | "negative_contrarian";
+export type ThumbnailArchetype = "gut_punch" | "label" | "alarm" | "confrontation";
+
+export type Tier = 0 | 1 | 2 | 3;
 
 export interface TierClassification {
   tier: Tier;
