@@ -161,6 +161,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
         },
       });
     }

@@ -116,6 +116,8 @@ async function readSSEStream(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let receivedComplete = false;
+  let receivedError = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -134,8 +136,10 @@ async function readSSEStream(
         if (json.type === "status") {
           callbacks.onStatus(json.message);
         } else if (json.type === "complete") {
+          receivedComplete = true;
           callbacks.onComplete(json.data);
         } else if (json.type === "error") {
+          receivedError = true;
           callbacks.onError(json.message);
         } else if (json.type === "pipeline_trace" && callbacks.onTrace) {
           callbacks.onTrace(json.entry);
@@ -146,6 +150,11 @@ async function readSSEStream(
         // Skip malformed JSON
       }
     }
+  }
+
+  // Detect premature stream termination (e.g. platform timeout killed the connection)
+  if (!receivedComplete && !receivedError) {
+    callbacks.onError("Connection lost — the server stream ended before completing. This usually means the hosting platform terminated the request.");
   }
 }
 

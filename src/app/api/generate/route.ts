@@ -1646,6 +1646,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (err) {
