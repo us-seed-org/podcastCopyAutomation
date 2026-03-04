@@ -26,7 +26,9 @@ import { supabase } from "@/lib/supabase";
 import { PipelineLogger } from "@/lib/pipeline-logger";
 import type { PipelineTraceEntry } from "@/types/pipeline-trace";
 
+export const runtime = "nodejs";
 export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 function extractKeyNouns(title: string): string[] {
   const stopwords = new Set(["the", "a", "an", "is", "are", "was", "and", "or", "of", "in", "to", "for", "on", "with", "by", "from", "at"]);

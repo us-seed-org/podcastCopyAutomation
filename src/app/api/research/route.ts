@@ -4,7 +4,9 @@ import { researchModel, openaiProvider } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
 import { researchOutputSchema } from "@/lib/schemas/research-output";
 
+export const runtime = "nodejs";
 export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 function sampleTranscript(text: string, totalChars = 8000): string {
   if (text.length <= totalChars) return text;

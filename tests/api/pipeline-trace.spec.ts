@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, APIRequestContext } from "@playwright/test";
 
 test.describe("Pipeline Trace SSE Events", () => {
     test.setTimeout(300000); // 5 minutes because LLM generations take time
@@ -33,21 +33,34 @@ test.describe("Pipeline Trace SSE Events", () => {
 
     function parseSSEEvents(body: string) {
         const events: any[] = [];
-        const blocks = body.split(/\n\s*\n/);
-        for (const block of blocks) {
-            const dataLines = block.split("\n").filter(l => l.startsWith("data: "));
-            if (dataLines.length === 0) continue;
-            const payload = dataLines.map(l => l.slice(6)).join("\n");
+        const lines = body.split(/\r?\n/);
+        let currentData = "";
+
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                currentData += (currentData ? "\n" : "") + line.slice(6);
+            } else if (line === "" && currentData) {
+                try {
+                    events.push(JSON.parse(currentData));
+                } catch (err) {
+                    console.debug("Failed to parse SSE payload:", currentData, err);
+                }
+                currentData = "";
+            }
+        }
+
+        // Catch any trailing data
+        if (currentData) {
             try {
-                events.push(JSON.parse(payload));
+                events.push(JSON.parse(currentData));
             } catch (err) {
-                console.debug("Failed to parse SSE payload:", payload, err);
+                // ignore
             }
         }
         return events;
     }
 
-    async function generateResponse(request: any) {
+    async function generateResponse(request: APIRequestContext) {
         return await request.post("/api/generate", {
             data: {
                 research: SAMPLE_RESEARCH,
