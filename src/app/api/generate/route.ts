@@ -674,6 +674,11 @@ export async function POST(request: Request) {
             pairwiseEnabled: !!pairwiseJudgeModel,
           });
 
+          // Send runId to client early so it can poll for results if the stream is cut
+          if (runId) {
+            sendSSE(controller, encoder, { type: "run_id", runId });
+          }
+
           // === PASS 1: Multi-model parallel generation ===
           logger.startPass("1");
           const systemPrompt = buildGenerationSystemPrompt();
@@ -1614,6 +1619,15 @@ Return the same JSON structure. Score honestly against the calibration benchmark
               insertPipelineLogs(runId, logger.getEntries()),
               updateRunSummary(runId, pipelineSummary),
             ]);
+          }
+
+          // Save final output to Supabase so clients can poll for it if the SSE stream is cut
+          if (runId && supabase) {
+            try {
+              await supabase.from("generation_runs").update({ output_json: generated }).eq("id", runId);
+            } catch (err) {
+              console.warn("[DB] Error saving output_json:", err);
+            }
           }
 
           // Emit pipeline summary SSE

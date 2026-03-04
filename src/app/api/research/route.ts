@@ -194,7 +194,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
             tools: {
               web_search_preview: openaiProvider.tools.webSearchPreview({}),
             },
-            stopWhen: stepCountIs(5),
+            stopWhen: stepCountIs(3),
           });
 
           sendSSE(controller, encoder, {

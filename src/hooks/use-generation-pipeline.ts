@@ -98,6 +98,12 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
   }
 }
 
+interface SSEResult {
+  receivedComplete: boolean;
+  receivedError: boolean;
+  runId: string | null;
+}
+
 async function readSSEStream(
   response: Response,
   callbacks: {
@@ -106,18 +112,20 @@ async function readSSEStream(
     onError: (msg: string) => void;
     onTrace?: (entry: unknown) => void;
     onSummary?: (summary: unknown) => void;
+    onRunId?: (runId: string) => void;
   }
-) {
+): Promise<SSEResult> {
   const reader = response.body?.getReader();
   if (!reader) {
     callbacks.onError("No response body");
-    return;
+    return { receivedComplete: false, receivedError: true, runId: null };
   }
 
   const decoder = new TextDecoder();
   let buffer = "";
   let receivedComplete = false;
   let receivedError = false;
+  let runId: string | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -145,6 +153,9 @@ async function readSSEStream(
           callbacks.onTrace(json.entry);
         } else if (json.type === "pipeline_summary" && callbacks.onSummary) {
           callbacks.onSummary(json.summary);
+        } else if (json.type === "run_id" && json.runId) {
+          runId = json.runId;
+          if (callbacks.onRunId) callbacks.onRunId(json.runId);
         }
       } catch {
         // Skip malformed JSON
@@ -152,10 +163,53 @@ async function readSSEStream(
     }
   }
 
-  // Detect premature stream termination (e.g. platform timeout killed the connection)
-  if (!receivedComplete && !receivedError) {
-    callbacks.onError("Connection lost — the server stream ended before completing. This usually means the hosting platform terminated the request.");
+  return { receivedComplete, receivedError, runId };
+}
+
+/**
+ * Poll the /api/generate/status endpoint until the pipeline completes or errors.
+ * Used as a fallback when the SSE stream is cut by platform timeouts.
+ */
+async function pollForResult(
+  runId: string,
+  callbacks: {
+    onStatus: (msg: string) => void;
+    onComplete: (data: GenerationOutput) => void;
+    onError: (msg: string) => void;
+    onSummary?: (summary: unknown) => void;
+  },
+  maxAttempts = 120, // 120 * 3s = 6 minutes max
+  intervalMs = 3000,
+): Promise<void> {
+  callbacks.onStatus("Stream interrupted — polling for results (pipeline still running on server)...");
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+
+    try {
+      const res = await fetch(`/api/generate/status?runId=${runId}`);
+      if (!res.ok) continue;
+
+      const data = await res.json();
+
+      if (data.status === "complete" && data.output) {
+        if (data.summary && callbacks.onSummary) {
+          callbacks.onSummary(data.summary);
+        }
+        callbacks.onComplete(data.output as GenerationOutput);
+        return;
+      } else if (data.status === "error") {
+        callbacks.onError("Pipeline failed on server");
+        return;
+      }
+      // Still running — update status
+      callbacks.onStatus(`Pipeline still running on server (${attempt + 1}/${maxAttempts})...`);
+    } catch {
+      // Network error during poll — continue trying
+    }
   }
+
+  callbacks.onError("Pipeline timed out — server did not complete within the expected time.");
 }
 
 export function useGenerationPipeline() {
@@ -190,7 +244,9 @@ export function useGenerationPipeline() {
           return;
         }
 
-        await readSSEStream(res, {
+        let capturedRunId: string | null = null;
+
+        const sseResult = await readSSEStream(res, {
           onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
           onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data: data as GenerationOutput }),
           onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
@@ -204,7 +260,26 @@ export function useGenerationPipeline() {
             }
           },
           onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
+          onRunId: (id) => { capturedRunId = id; },
         });
+
+        // If the stream ended without complete/error and we have a runId,
+        // the server is likely still processing (Netlify timeout cut the stream).
+        // Fall back to polling the status endpoint.
+        if (!sseResult.receivedComplete && !sseResult.receivedError && capturedRunId) {
+          await pollForResult(capturedRunId, {
+            onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
+            onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data }),
+            onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
+            onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
+          });
+        } else if (!sseResult.receivedComplete && !sseResult.receivedError) {
+          // Stream cut but no runId — can't poll, show error
+          dispatch({
+            type: "GENERATION_ERROR",
+            error: "Connection lost — the server stream ended before completing. This usually means the hosting platform terminated the request.",
+          });
+        }
       } catch (err) {
         dispatch({
           type: "GENERATION_ERROR",

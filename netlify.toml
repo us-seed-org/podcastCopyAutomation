@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Prevent CDN/proxy buffering on SSE streaming endpoints
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    X-Accel-Buffering = "no"
+    Cache-Control = "no-cache, no-transform"
