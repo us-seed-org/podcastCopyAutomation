@@ -17,6 +17,7 @@
     "@ai-sdk/openai-compatible": "^2.0.30",
     "@supabase/supabase-js": "^2.97.0",
     "ai": "^6.0.86",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.563.0",
