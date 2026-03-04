@@ -8,6 +8,7 @@ import {
     RefreshCw,
     Clock,
     AlertTriangle,
+    type LucideIcon,
 } from "lucide-react";
 import type { PipelineSummary as PipelineSummaryType } from "@/types/pipeline-trace";
 
@@ -37,7 +38,7 @@ function StatBox({
     color,
     subtext,
 }: {
-    icon: typeof Zap;
+    icon: LucideIcon;
     label: string;
     value: string | number;
     color: string;

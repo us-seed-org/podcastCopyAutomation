@@ -25,14 +25,18 @@ export function HumanFeedback({
     const isMounted = useRef(true);
 
     useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (initialRating !== undefined) setRating(initialRating);
         if (initialNotes !== undefined) setNotes(initialNotes);
         if (initialRating || initialNotes) {
             setShowNotes(true);
         }
-        return () => {
-            isMounted.current = false;
-        };
     }, [initialRating, initialNotes]);
 
     if (!titleResultId) return null;

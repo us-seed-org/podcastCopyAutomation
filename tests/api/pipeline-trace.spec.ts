@@ -40,11 +40,11 @@ test.describe("Pipeline Trace SSE Events", () => {
             const payload = dataLines.map(l => l.slice(6)).join("\n");
             try {
                 events.push(JSON.parse(payload));
-            } catch {
-                // ignore
+            } catch (err) {
+                console.debug("Failed to parse SSE payload:", payload, err);
             }
         }
-        return events.filter(Boolean);
+        return events;
     }
 
     async function generateResponse(request: any) {

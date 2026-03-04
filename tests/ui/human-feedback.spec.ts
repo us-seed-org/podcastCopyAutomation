@@ -14,10 +14,6 @@ test.describe("Human Feedback Component", () => {
 
         // Stars only render when titleResultId is present on a title
         const starCount = await stars.count();
-        if (starCount < 4) {
-            test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
-            return;
-        }
 
         // Click the 4th star (index 3)
         await stars.nth(3).click();
@@ -61,10 +57,6 @@ test.describe("Human Feedback Component", () => {
 
         const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
         const starCount = await stars.count();
-        if (starCount < 3) {
-            test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
-            return;
-        }
 
         // Click 3rd star
         await stars.nth(2).click();

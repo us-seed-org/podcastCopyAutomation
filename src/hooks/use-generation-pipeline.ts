@@ -83,10 +83,9 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         pipelineSummary: null,
       };
     case "PIPELINE_TRACE": {
-      const entry = { ...action.entry, id: action.entry.id ?? crypto.randomUUID() };
       return {
         ...state,
-        traceEntries: [...state.traceEntries, entry],
+        traceEntries: [...state.traceEntries, action.entry],
       };
     }
     case "PIPELINE_SUMMARY":
@@ -186,7 +185,15 @@ export function useGenerationPipeline() {
           onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
           onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data: data as GenerationOutput }),
           onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
-          onTrace: (entry) => dispatch({ type: "PIPELINE_TRACE", entry: entry as import("@/types/pipeline-trace").PipelineTraceEntry }),
+          onTrace: (entry: unknown) => {
+            if (entry && typeof entry === "object") {
+              const entryObj = entry as Partial<import("@/types/pipeline-trace").PipelineTraceEntry>;
+              dispatch({
+                type: "PIPELINE_TRACE",
+                entry: { ...entryObj, id: entryObj.id ?? crypto.randomUUID() } as import("@/types/pipeline-trace").PipelineTraceEntry
+              });
+            }
+          },
           onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
         });
       } catch (err) {

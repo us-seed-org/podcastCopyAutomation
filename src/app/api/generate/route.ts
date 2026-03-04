@@ -329,7 +329,7 @@ async function scoreWithPanel(
     scorers.push({ model: geminiScoringModel, name: "Gemini 3.1 Pro" });
   }
 
-  const SCORING_CALL_TIMEOUT_MS = 120_000;
+  const SCORING_CALL_TIMEOUT_MS = 150_000;
 
   const results = await Promise.allSettled(
     scorers.map((s) => {
