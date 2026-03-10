@@ -10,23 +10,31 @@ const THUMBNAIL_IMAGE_MODEL =
 const THUMBNAIL_TEXT_MODEL =
   process.env.THUMBNAIL_TEXT_MODEL || "gemini-3.1-flash";
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 async function fetchImageAsBase64(imageUrl: string): Promise<string | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    let imgResp: Response;
-    try {
-      imgResp = await fetch(imageUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; ThumbnailBot/1.0)",
-        },
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+    const imgResp = await fetchWithTimeout(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ThumbnailBot/1.0)",
+      },
+    });
     if (!imgResp.ok) return null;
 
     const arrayBuf = await imgResp.arrayBuffer();
@@ -53,14 +61,14 @@ async function findGuestHeadshot(
   try {
     console.log(`[Headshot] Searching Wikipedia for "${guestName}"…`);
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(guestName)}&srlimit=1&format=json&origin=*`;
-    const searchResp = await fetch(searchUrl);
+    const searchResp = await fetchWithTimeout(searchUrl);
     if (searchResp.ok) {
       const searchData = await searchResp.json();
       const pageTitle = searchData?.query?.search?.[0]?.title;
       if (pageTitle) {
         console.log(`[Headshot] Wikipedia found page: "${pageTitle}"`);
         const imgUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&piprop=original&format=json&origin=*`;
-        const imgResp = await fetch(imgUrl);
+        const imgResp = await fetchWithTimeout(imgUrl);
         if (imgResp.ok) {
           const imgData = await imgResp.json();
           const pages = imgData.query?.pages;
@@ -200,19 +208,19 @@ async function removeBackground(imageBase64: string): Promise<string> {
 async function processGuests(
   guests: GuestInput[]
 ): Promise<ProcessedGuest[]> {
-  const results: ProcessedGuest[] = [];
-  for (const guest of guests) {
-    let rawImage: string | null = guest.headshotBase64 ?? null;
-    if (!rawImage && guest.name.trim()) {
-      rawImage = await findGuestHeadshot(guest.name.trim());
-    }
-    let cleanedHeadshot: string | undefined;
-    if (rawImage) {
-      cleanedHeadshot = await removeBackground(rawImage);
-    }
-    results.push({ name: guest.name, cleanedHeadshot });
-  }
-  return results;
+  return Promise.all(
+    guests.map(async (guest) => {
+      let rawImage: string | null = guest.headshotBase64 ?? null;
+      if (!rawImage && guest.name.trim()) {
+        rawImage = await findGuestHeadshot(guest.name.trim());
+      }
+      let cleanedHeadshot: string | undefined;
+      if (rawImage) {
+        cleanedHeadshot = await removeBackground(rawImage);
+      }
+      return { name: guest.name, cleanedHeadshot };
+    })
+  );
 }
 
 async function generateVariantCopy(
@@ -580,7 +588,7 @@ export async function POST(req: NextRequest) {
     // Generate thumbnails sequentially (rate limit friendly)
     const thumbnails: { imageUrl: string; description: string }[] = [];
     const refUrls: string[] = Array.isArray(existingThumbnailUrls)
-      ? existingThumbnailUrls.slice(0, 5)
+      ? existingThumbnailUrls.slice(0, 3)
       : [];
 
     for (let i = 0; i < count; i++) {

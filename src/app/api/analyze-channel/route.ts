@@ -5,6 +5,13 @@ export const maxDuration = 120;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
+class ClientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClientError";
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function cleanChannelUrl(rawUrl: string): string {
@@ -29,11 +36,11 @@ async function resolveChannelId(channelUrl: string): Promise<string> {
 
   const parsed = new URL(url);
   if (parsed.protocol !== "https:") {
-    throw new Error("Only HTTPS YouTube URLs are supported");
+    throw new ClientError("Only HTTPS YouTube URLs are supported");
   }
   const allowedHosts = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"];
   if (!allowedHosts.includes(parsed.hostname)) {
-    throw new Error("URL must be a YouTube channel URL");
+    throw new ClientError("URL must be a YouTube channel URL");
   }
 
   console.log("[Analyze] Fetching channel page:", url);
@@ -42,6 +49,9 @@ async function resolveChannelId(channelUrl: string): Promise<string> {
   });
 
   if (!resp.ok) {
+    if (resp.status === 404) {
+      throw new ClientError("Channel not found. Check the URL and try again.");
+    }
     throw new Error(`Failed to fetch channel page: ${resp.status}`);
   }
 
@@ -55,7 +65,7 @@ async function resolveChannelId(channelUrl: string): Promise<string> {
   const rssMatch = html.match(/channel_id=(UC[\w-]{22})/);
   if (rssMatch) return rssMatch[1];
 
-  throw new Error(
+  throw new ClientError(
     "Could not resolve channel ID from URL. Try using the channel's direct URL."
   );
 }
@@ -206,9 +216,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!channelUrl) {
+    if (typeof channelUrl !== "string" || !channelUrl.trim()) {
       return NextResponse.json(
-        { error: "channelUrl is required" },
+        { error: "channelUrl must be a non-empty string" },
         { status: 400 }
       );
     }
@@ -235,7 +245,7 @@ export async function POST(req: NextRequest) {
     const channelName = getChannelNameFromRss(rssXml);
 
     if (allVideoIds.length === 0) {
-      throw new Error("No videos found on this channel");
+      throw new ClientError("No videos found on this channel");
     }
 
     // 3. Filter out Shorts
@@ -260,7 +270,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (videoIds.length === 0) {
-      throw new Error(
+      throw new ClientError(
         "No long-form videos found on this channel (only Shorts detected)"
       );
     }
@@ -291,6 +301,7 @@ export async function POST(req: NextRequest) {
     console.error("[Analyze] Error:", error);
     const message =
       error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = error instanceof ClientError ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

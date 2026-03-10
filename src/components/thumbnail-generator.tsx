@@ -35,6 +35,8 @@ interface ThumbnailGeneratorProps {
   guestName?: string;
 }
 
+const MAX_HEADSHOT_BYTES = 5 * 1024 * 1024; // 5 MB
+
 export function ThumbnailGenerator({
   data,
   guestName: initialGuestName,
@@ -58,27 +60,28 @@ export function ThumbnailGenerator({
     }
   }, [initialGuestName]);
 
-  const ANALYSIS_STEPS = [
-    "Resolving channel…",
-    "Fetching recent videos…",
-    "Filtering out Shorts…",
-    "Downloading thumbnails…",
-    "Analyzing visual patterns with AI…",
-  ];
-
   const guestCount = guests.filter((g) => g.name.trim()).length;
-  const GENERATION_STEPS = [
-    guestCount > 1
-      ? `Looking up headshots for ${guestCount} guests…`
-      : "Looking up guest headshot…",
-    "Removing backgrounds…",
-    "Generating variant copy…",
-    "Generating thumbnail 1 of 3…",
-    "Generating thumbnail 2 of 3…",
-    "Generating thumbnail 3 of 3…",
-  ];
 
   useEffect(() => {
+    const ANALYSIS_STEPS = [
+      "Resolving channel…",
+      "Fetching recent videos…",
+      "Filtering out Shorts…",
+      "Downloading thumbnails…",
+      "Analyzing visual patterns with AI…",
+    ];
+
+    const GENERATION_STEPS = [
+      guestCount > 1
+        ? `Looking up headshots for ${guestCount} guests…`
+        : "Looking up guest headshot…",
+      "Removing backgrounds…",
+      "Generating variant copy…",
+      "Generating thumbnail 1 of 3…",
+      "Generating thumbnail 2 of 3…",
+      "Generating thumbnail 3 of 3…",
+    ];
+
     if (state.stage === "analyzing") {
       let stepIndex = 0;
       setProgressMsg(ANALYSIS_STEPS[0]);
@@ -102,7 +105,7 @@ export function ThumbnailGenerator({
     } else {
       setProgressMsg("");
     }
-  }, [state.stage]);
+  }, [state.stage, guestCount]);
 
   const allTitles = [...data.youtubeTitles, ...data.spotifyTitles];
   const selectedTitle = allTitles[selectedTitleIdx] ?? allTitles[0];
@@ -128,20 +131,31 @@ export function ThumbnailGenerator({
     );
   }, []);
 
+
   const handleGuestFileChange = useCallback(
     (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (file.size > MAX_HEADSHOT_BYTES) {
+        alert(`Headshot must be under 5 MB (selected: ${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+        e.target.value = "";
+        return;
+      }
       const reader = new FileReader();
+      reader.onerror = () => {
+        console.error("[ThumbnailGenerator] FileReader error:", reader.error);
+        alert("Failed to read the selected file. Please try again.");
+        e.target.value = "";
+      };
       reader.onload = () => {
         setGuests((prev) =>
           prev.map((g) =>
             g.id === id
               ? {
-                  ...g,
-                  headshotBase64: reader.result as string,
-                  headshotName: file.name,
-                }
+                ...g,
+                headshotBase64: reader.result as string,
+                headshotName: file.name,
+              }
               : g
           )
         );
@@ -338,172 +352,172 @@ export function ThumbnailGenerator({
           {(state.stage === "analyzed" ||
             state.stage === "generating" ||
             state.stage === "complete") && (
-            <>
-              <Separator />
-              <div className="space-y-4">
-                <Label className="text-sm font-medium flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Step 3: Generate Thumbnails
-                </Label>
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Step 3: Generate Thumbnails
+                  </Label>
 
-                {/* Guests */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      Guests (auto-finds headshots via Wikipedia)
-                    </Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={addGuest}
-                      disabled={state.stage === "generating"}
-                    >
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Add Guest
-                    </Button>
-                  </div>
-
+                  {/* Guests */}
                   <div className="space-y-2">
-                    {guests.map((guest, idx) => (
-                      <div
-                        key={guest.id}
-                        className="rounded-lg border border-border p-3 space-y-2"
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        Guests (auto-finds headshots via Wikipedia)
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={addGuest}
+                        disabled={state.stage === "generating"}
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <Input
-                              placeholder={`Guest ${idx + 1} name (e.g. Elon Musk)`}
-                              value={guest.name}
-                              onChange={(e) =>
-                                updateGuestName(guest.id, e.target.value)
-                              }
-                              disabled={state.stage === "generating"}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          {guests.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
-                              onClick={() => removeGuest(guest.id)}
-                              disabled={state.stage === "generating"}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
+                        <UserPlus className="h-3 w-3 mr-1" />
+                        Add Guest
+                      </Button>
+                    </div>
 
-                        <div className="pl-1">
-                          <p className="text-[10px] text-muted-foreground mb-1.5">
-                            Override headshot (optional — we&apos;ll auto-find
-                            one)
-                          </p>
-                          <input
-                            ref={(el) => {
-                              fileInputRefs.current[guest.id] = el;
-                            }}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleGuestFileChange(guest.id, e)
-                            }
-                          />
-                          {guest.headshotBase64 ? (
-                            <div className="flex items-center gap-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={guest.headshotBase64}
-                                alt="Headshot preview"
-                                className="w-10 h-10 rounded-full object-cover border border-border"
+                    <div className="space-y-2">
+                      {guests.map((guest, idx) => (
+                        <div
+                          key={guest.id}
+                          className="rounded-lg border border-border p-3 space-y-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <Input
+                                placeholder={`Guest ${idx + 1} name (e.g. Elon Musk)`}
+                                value={guest.name}
+                                onChange={(e) =>
+                                  updateGuestName(guest.id, e.target.value)
+                                }
+                                disabled={state.stage === "generating"}
+                                className="h-8 text-sm"
                               />
-                              <span className="text-xs text-muted-foreground truncate flex-1">
-                                {guest.headshotName}
-                              </span>
+                            </div>
+                            {guests.length > 1 && (
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6"
-                                onClick={() =>
-                                  clearGuestHeadshot(guest.id)
-                                }
+                                className="h-8 w-8 shrink-0"
+                                onClick={() => removeGuest(guest.id)}
+                                disabled={state.stage === "generating"}
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-3.5 w-3.5" />
                               </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() =>
-                                fileInputRefs.current[guest.id]?.click()
+                            )}
+                          </div>
+
+                          <div className="pl-1">
+                            <p className="text-[10px] text-muted-foreground mb-1.5">
+                              Override headshot (optional — we&apos;ll auto-find
+                              one)
+                            </p>
+                            <input
+                              ref={(el) => {
+                                fileInputRefs.current[guest.id] = el;
+                              }}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) =>
+                                handleGuestFileChange(guest.id, e)
                               }
-                              disabled={state.stage === "generating"}
-                            >
-                              <Upload className="h-3 w-3 mr-1" />
-                              Upload Headshot
-                            </Button>
-                          )}
+                            />
+                            {guest.headshotBase64 ? (
+                              <div className="flex items-center gap-2">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={guest.headshotBase64}
+                                  alt="Headshot preview"
+                                  className="w-10 h-10 rounded-full object-cover border border-border"
+                                />
+                                <span className="text-xs text-muted-foreground truncate flex-1">
+                                  {guest.headshotName}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() =>
+                                    clearGuestHeadshot(guest.id)
+                                  }
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() =>
+                                  fileInputRefs.current[guest.id]?.click()
+                                }
+                                disabled={state.stage === "generating"}
+                              >
+                                <Upload className="h-3 w-3 mr-1" />
+                                Upload Headshot
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Title selector */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    Select title for thumbnail
-                  </Label>
-                  <select
-                    value={selectedTitleIdx}
-                    onChange={(e) =>
-                      setSelectedTitleIdx(Number(e.target.value))
+                  {/* Title selector */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      Select title for thumbnail
+                    </Label>
+                    <select
+                      value={selectedTitleIdx}
+                      onChange={(e) =>
+                        setSelectedTitleIdx(Number(e.target.value))
+                      }
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      {allTitles.map((t, i) => (
+                        <option key={i} value={i}>
+                          [{t.archetype ?? t.score?.total ? "youtube" : "spotify"}
+                          ] {t.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={
+                      state.stage === "generating" || !selectedTitle
                     }
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="w-full"
                   >
-                    {allTitles.map((t, i) => (
-                      <option key={i} value={i}>
-                        [{t.archetype ?? t.score?.total ? "youtube" : "spotify"}
-                        ] {t.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    {state.stage === "generating" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        Generating Thumbnails…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-1.5" />
+                        Generate 3 Thumbnail Variants
+                      </>
+                    )}
+                  </Button>
 
-                <Button
-                  onClick={handleGenerate}
-                  disabled={
-                    state.stage === "generating" || !selectedTitle
-                  }
-                  className="w-full"
-                >
-                  {state.stage === "generating" ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                      Generating Thumbnails…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-1.5" />
-                      Generate 3 Thumbnail Variants
-                    </>
+                  {state.stage === "generating" && progressMsg && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      {progressMsg}
+                    </div>
                   )}
-                </Button>
-
-                {state.stage === "generating" && progressMsg && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                    {progressMsg}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+                </div>
+              </>
+            )}
 
           {/* Step 4: Results */}
           {state.generatedThumbnails.length > 0 && (
