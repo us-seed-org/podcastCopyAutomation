@@ -91,6 +91,7 @@ export default function GeneratePage() {
                                 data={state.generation}
                                 onRegenerate={regenerate}
                                 isRegenerating={isRegenerating}
+                                guestName={state.research?.guest?.name}
                             />
 
                             <div className="text-center pt-4 pb-8">

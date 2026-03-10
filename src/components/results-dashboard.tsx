@@ -10,11 +10,13 @@ import { CopyButton } from "@/components/copy-button";
 import { ScoreBadge } from "@/components/score-badge";
 import { RefreshCw, Youtube, Headphones, FileText, ListOrdered, Copy, Check } from "lucide-react";
 import type { GenerationOutput } from "@/types/generation";
+import { ThumbnailGenerator } from "@/components/thumbnail-generator";
 
 interface ResultsDashboardProps {
     data: GenerationOutput;
     onRegenerate: () => void;
     isRegenerating: boolean;
+    guestName?: string;
 }
 
 function CopyAllButton({ text, label }: { text: string; label: string }) {
@@ -40,7 +42,7 @@ function CopyAllButton({ text, label }: { text: string; label: string }) {
     );
 }
 
-export function ResultsDashboard({ data, onRegenerate, isRegenerating }: ResultsDashboardProps) {
+export function ResultsDashboard({ data, onRegenerate, isRegenerating, guestName }: ResultsDashboardProps) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -201,6 +203,11 @@ export function ResultsDashboard({ data, onRegenerate, isRegenerating }: Results
                         ))}
                     </div>
                 )}
+
+                <Separator className="bg-border/50" />
+
+                {/* Thumbnail Generator */}
+                <ThumbnailGenerator data={data} guestName={guestName} />
             </div>
         </div>
     );
