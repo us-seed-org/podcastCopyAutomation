@@ -232,6 +232,7 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
               }
             }
           }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let parsed: any = null;
           for (const candidate of candidates) {
             try {

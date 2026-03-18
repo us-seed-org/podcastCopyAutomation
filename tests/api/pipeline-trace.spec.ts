@@ -32,6 +32,7 @@ test.describe("Pipeline Trace SSE Events", () => {
     const SAMPLE_EPISODE_DESCRIPTION = "Jane Doe discusses her research into why 73% of startups fail due to lack of customer conversations, and shares a practical framework for pre-launch validation.";
 
     function parseSSEEvents(body: string) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const events: any[] = [];
         const lines = body.split(/\r?\n/);
         let currentData = "";
@@ -53,8 +54,9 @@ test.describe("Pipeline Trace SSE Events", () => {
         if (currentData) {
             try {
                 events.push(JSON.parse(currentData));
-            } catch (err) {
-                // ignore
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                } catch (_err) {
+                    // ignore
             }
         }
         return events;

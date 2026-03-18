@@ -211,13 +211,9 @@ export function PipelineTrace({ entries, isRunning }: PipelineTraceProps) {
         }
     }, [entries.length, isRunning]);
 
-    // Default open while running, collapse after
+    // Collapse after pipeline stops; open again when it resumes
     useEffect(() => {
-        if (!isRunning) {
-            setIsOpen(false);
-        } else {
-            setIsOpen(true);
-        }
+        setIsOpen(isRunning);
     }, [isRunning]);
 
     if (!entries || entries.length === 0) return null;

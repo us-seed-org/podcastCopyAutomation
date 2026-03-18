@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScoreBadge } from "@/components/score-badge";
 import { ScoreBreakdownChart } from "@/components/score-breakdown";
 import { ThumbnailTextScoreChart } from "@/components/thumbnail-text-score";
 import { CopyButton } from "@/components/copy-button";
 import { HumanFeedback } from "@/components/human-feedback";
-import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon, RefreshCw } from "lucide-react";
 import type { TitleOption, TitleArchetype, ThumbnailArchetype } from "@/types/generation";
 
 const archetypeLabels: Record<TitleArchetype, string> = {
@@ -36,6 +37,9 @@ interface TitleCardProps {
   title: TitleOption;
   platform: "youtube" | "spotify";
   index: number;
+  onRegenerateTarget?: (archetype: TitleArchetype) => void;
+  isRegeneratingTarget?: boolean;
+  disableRegenerate?: boolean;
 }
 
 const platformStyles = {
@@ -51,7 +55,14 @@ const platformStyles = {
   },
 };
 
-export function TitleCard({ title, platform, index }: TitleCardProps) {
+export function TitleCard({
+  title,
+  platform,
+  index,
+  onRegenerateTarget,
+  isRegeneratingTarget,
+  disableRegenerate,
+}: TitleCardProps) {
   const [open, setOpen] = useState(false);
   const style = platformStyles[platform];
   const charCount = title.title.length;
@@ -142,7 +153,21 @@ export function TitleCard({ title, platform, index }: TitleCardProps) {
 
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between">
-            <CopyButton text={title.title} label="Copy Title" />
+            <div className="flex items-center gap-2">
+              <CopyButton text={title.title} label="Copy Title" />
+              {platform === "youtube" && title.archetype && onRegenerateTarget && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 px-2.5 text-xs"
+                  disabled={disableRegenerate || isRegeneratingTarget}
+                  onClick={() => onRegenerateTarget(title.archetype!)}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isRegeneratingTarget ? "animate-spin" : ""}`} />
+                  {isRegeneratingTarget ? "Regenerating..." : "Regenerate"}
+                </Button>
+              )}
+            </div>
 
             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
               Score Breakdown

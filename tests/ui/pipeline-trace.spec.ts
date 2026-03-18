@@ -40,6 +40,7 @@ data: {"type": "pipeline_trace", "entry": {"timestamp": 127, "pass": "3", "event
         });
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function triggerGeneration(page: any) {
         await page.locator('#guestName').fill("Test Guest");
         await page.locator('#podcastName').fill("Test Podcast");
