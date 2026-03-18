@@ -16,7 +16,7 @@ import {
   buildThumbnailRefinementSystemPrompt,
   buildThumbnailRefinementUserPrompt,
 } from "@/lib/prompts/thumbnail-refinement-system";
-import { titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
+import { generatedYouTubeTitleSchema, titleGenerationOutputSchema } from "@/lib/schemas/title-generation-output";
 import { scoringOutputSchema } from "@/lib/schemas/scoring-output";
 import { descriptionChapterOutputSchema } from "@/lib/schemas/description-chapter-output";
 import { checkAiSlop, checkThumbnailText, checkChapterTitles } from "@/lib/guardrails/ai-slop";
@@ -24,6 +24,7 @@ import { checkTierCompliance } from "@/lib/guardrails/tier-compliance";
 import { runPairwiseTournament } from "@/lib/pairwise-tournament";
 import { supabase } from "@/lib/supabase";
 import { PipelineLogger } from "@/lib/pipeline-logger";
+import type { GenerationMode, GenerationOutput, GenerationRequestPayload } from "@/types/generation";
 import type { PipelineTraceEntry } from "@/types/pipeline-trace";
 
 export const runtime = "nodejs";
@@ -124,6 +125,8 @@ interface BaseTitleItem {
   platformNotes?: string;
   archetype?: TitleArchetype;
   sourceModel?: string;
+  titleResultId?: string;
+  rewritten?: boolean;
 }
 
 interface YouTubeTitleItem extends BaseTitleItem {
@@ -608,16 +611,475 @@ async function updateRunSummary(
   }
 }
 
+const GENERATION_MODES: GenerationMode[] = [
+  "full",
+  "regenerate_title",
+  "rescore",
+  "rerank",
+  "recontent",
+];
+
+type ModelStatsMap = Map<
+  string,
+  {
+    generated: number;
+    selected: number;
+    totalScore: number;
+    totalThumbScore: number;
+    timeMs: number;
+    hadErrors: boolean;
+    errorMsg?: string;
+  }
+>;
+
+function isGenerationMode(value: unknown): value is GenerationMode {
+  return typeof value === "string" && (GENERATION_MODES as string[]).includes(value);
+}
+
+function cloneExistingGeneration(existing: GenerationOutput): {
+  youtubeTitles: YouTubeTitleItem[];
+  spotifyTitles: BaseTitleItem[];
+  rejectedTitles: ScoredTitle[];
+} {
+  return {
+    youtubeTitles: (existing.youtubeTitles || []).map((t) => ({ ...(t as any) })),
+    spotifyTitles: (existing.spotifyTitles || []).map((t) => ({ ...(t as any) })),
+    rejectedTitles: (existing.rejectedTitles || []).map((t) => ({ ...(t as any) })),
+  };
+}
+
+function toScoreInput(youtubeTitles: YouTubeTitleItem[], spotifyTitles: BaseTitleItem[]) {
+  return {
+    youtubeTitles: youtubeTitles.map((t: any) => ({
+      title: t.title,
+      thumbnailText: t.thumbnailText,
+      score: t.score,
+      thumbnailTextScore: t.thumbnailTextScore,
+      scrollStopReason: t.scrollStopReason,
+      emotionalTrigger: t.emotionalTrigger,
+      platformNotes: t.platformNotes,
+    })),
+    spotifyTitles: spotifyTitles.map((t: any) => ({
+      title: t.title,
+      score: t.score,
+      scrollStopReason: t.scrollStopReason,
+      emotionalTrigger: t.emotionalTrigger,
+      platformNotes: t.platformNotes,
+    })),
+  };
+}
+
+function mergeScoredTitles(
+  scored: any,
+  youtubeTitles: YouTubeTitleItem[],
+  spotifyTitles: BaseTitleItem[],
+  logger: PipelineLogger
+): { youtubeTitles: YouTubeTitleItem[]; spotifyTitles: BaseTitleItem[] } {
+  let mergedYoutube = youtubeTitles;
+  let mergedSpotify = spotifyTitles;
+
+  const ytScoreLookup = new Map<string, any>();
+  if (scored?.youtubeTitles) {
+    for (const scoredItem of scored.youtubeTitles) {
+      if (scoredItem.title) {
+        ytScoreLookup.set(normalizeTitle(scoredItem.title), scoredItem);
+      }
+    }
+  }
+
+  const spScoreLookup = new Map<string, any>();
+  if (scored?.spotifyTitles) {
+    for (const scoredItem of scored.spotifyTitles) {
+      if (scoredItem.title) {
+        spScoreLookup.set(normalizeTitle(scoredItem.title), scoredItem);
+      }
+    }
+  }
+
+  if (ytScoreLookup.size > 0) {
+    mergedYoutube = youtubeTitles.map((t: any) => {
+      const scoredItem = ytScoreLookup.get(normalizeTitle(t.title));
+      if (!scoredItem) return t;
+      const merged = {
+        ...t,
+        score: scoredItem.score ?? t.score,
+        scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
+        platformNotes: scoredItem.platformNotes ?? t.platformNotes,
+        thumbnailTextScore: scoredItem.thumbnailTextScore ?? t.thumbnailTextScore,
+      };
+      logger.log({
+        pass: "2",
+        event: "title_scored",
+        title: merged.title,
+        model: merged.sourceModel,
+        platform: "youtube",
+        archetype: merged.archetype,
+        scoreTotal: merged.score?.total,
+        scoreDimensions: merged.score,
+        thumbnailText: merged.thumbnailText,
+        thumbnailScoreTotal: merged.thumbnailTextScore?.total,
+        thumbnailScoreDimensions: merged.thumbnailTextScore,
+      });
+      return merged;
+    });
+  }
+
+  if (spScoreLookup.size > 0) {
+    mergedSpotify = spotifyTitles.map((t: any) => {
+      const scoredItem = spScoreLookup.get(normalizeTitle(t.title));
+      if (!scoredItem) return t;
+      const merged = {
+        ...t,
+        score: scoredItem.score ?? t.score,
+        scrollStopReason: scoredItem.scrollStopReason ?? t.scrollStopReason,
+        platformNotes: scoredItem.platformNotes ?? t.platformNotes,
+      };
+      logger.log({
+        pass: "2",
+        event: "title_scored",
+        title: merged.title,
+        model: merged.sourceModel,
+        platform: "spotify",
+        scoreTotal: merged.score?.total,
+        scoreDimensions: merged.score,
+      });
+      return merged;
+    });
+  }
+
+  return {
+    youtubeTitles: mergedYoutube,
+    spotifyTitles: mergedSpotify,
+  };
+}
+
+async function runScoringPass(params: {
+  controller: ReadableStreamDefaultController;
+  encoder: TextEncoder;
+  logger: PipelineLogger;
+  researchStr: string;
+  youtubeTitles: YouTubeTitleItem[];
+  spotifyTitles: BaseTitleItem[];
+}): Promise<{
+  youtubeTitles: YouTubeTitleItem[];
+  spotifyTitles: BaseTitleItem[];
+  scored: any;
+}> {
+  const { controller, encoder, logger, researchStr } = params;
+  let { youtubeTitles, spotifyTitles } = params;
+
+  logger.startPass("2");
+  const scorerNames = geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
+  sendSSE(controller, encoder, {
+    type: "status",
+    message: `Scoring ${youtubeTitles.length} YouTube + ${spotifyTitles.length} Spotify titles with ${scorerNames}...`,
+  });
+
+  const benchmarkAnchors = await fetchBenchmarks(5);
+  const scoringPrompt = buildScoringSystemPrompt() + benchmarkAnchors;
+
+  let scored: any = null;
+  try {
+    scored = await scoreWithPanel(
+      toScoreInput(youtubeTitles, spotifyTitles),
+      researchStr,
+      scoringPrompt
+    );
+  } catch (err) {
+    console.warn("[PASS 2] Scoring panel failed:", err);
+    sendSSE(controller, encoder, {
+      type: "status",
+      message: "Scoring failed — continuing with self-assessed scores",
+    });
+  }
+
+  if (scored) {
+    const merged = mergeScoredTitles(scored, youtubeTitles, spotifyTitles, logger);
+    youtubeTitles = merged.youtubeTitles;
+    spotifyTitles = merged.spotifyTitles;
+  }
+
+  logger.endPass("2");
+  return { youtubeTitles, spotifyTitles, scored };
+}
+
+async function runPairwiseRerankPass(params: {
+  controller: ReadableStreamDefaultController;
+  encoder: TextEncoder;
+  logger: PipelineLogger;
+  episodeDescription: string;
+  youtubeTitles: YouTubeTitleItem[];
+}): Promise<YouTubeTitleItem[]> {
+  const { controller, encoder, logger, episodeDescription } = params;
+  let { youtubeTitles } = params;
+
+  logger.startPass("2.5");
+  if (pairwiseJudgeModel && youtubeTitles.length > 1) {
+    const topN = Math.min(PAIRWISE_TOP_N, youtubeTitles.length);
+    const totalPairs = (topN * (topN - 1)) / 2;
+    sendSSE(controller, encoder, {
+      type: "status",
+      message: `Running pairwise tournament on top ${topN} YouTube titles with Gemini (${totalPairs} unique pairs)...`,
+    });
+
+    try {
+      const tournamentInput = youtubeTitles.map((t) => ({
+        title: t.title,
+        thumbnailText: t.thumbnailText || "",
+        score: { total: t.score?.total || 0 },
+      }));
+      const tournament = await runPairwiseTournament(
+        tournamentInput,
+        episodeDescription,
+        topN,
+        (completed, total) => {
+          if (completed % 5 === 0 || completed === total) {
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Pairwise tournament: ${completed}/${total} comparisons complete...`,
+            });
+          }
+        }
+      );
+
+      if (tournament) {
+        const rankedTitles = tournament.titles.map((t, idx) => ({
+          ...t,
+          pairwiseWins: tournament.wins.get(idx) || 0,
+        }));
+        rankedTitles.sort((a, b) => {
+          if ((b.pairwiseWins || 0) !== (a.pairwiseWins || 0)) {
+            return (b.pairwiseWins || 0) - (a.pairwiseWins || 0);
+          }
+          return (b.score?.total || 0) - (a.score?.total || 0);
+        });
+
+        const rankedWithOrder = rankedTitles.map((t, idx) => ({
+          ...t,
+          pairwiseRank: idx + 1,
+        }));
+
+        youtubeTitles = youtubeTitles.map((t) => {
+          const ranked = rankedWithOrder.find(
+            (candidate) => normalizeTitle(candidate.title) === normalizeTitle(t.title)
+          );
+          if (!ranked) return t;
+          logger.log({
+            pass: "2.5",
+            event: "pairwise_result",
+            title: ranked.title,
+            model: t.sourceModel,
+            pairwiseRank: ranked.pairwiseRank,
+            pairwiseWins: ranked.pairwiseWins,
+            scoreTotal: t.score?.total,
+          });
+          return {
+            ...t,
+            pairwiseRank: ranked.pairwiseRank,
+            pairwiseWins: ranked.pairwiseWins,
+          };
+        });
+      }
+    } catch (error) {
+      console.warn("[PASS 2.5] Pairwise rerank failed:", error);
+      sendSSE(controller, encoder, {
+        type: "status",
+        message: "Pairwise tournament failed, keeping score-based order.",
+      });
+    }
+  }
+
+  const hasPairwiseData = youtubeTitles.some((t) => t.pairwiseRank !== undefined);
+  youtubeTitles.sort((a, b) => {
+    if (hasPairwiseData) {
+      if (a.pairwiseRank !== undefined && b.pairwiseRank !== undefined) {
+        return a.pairwiseRank - b.pairwiseRank;
+      }
+      if (a.pairwiseRank !== undefined) return -1;
+      if (b.pairwiseRank !== undefined) return 1;
+    }
+    return (b.score?.total || 0) - (a.score?.total || 0);
+  });
+  logger.endPass("2.5");
+  return youtubeTitles;
+}
+
+async function runDescriptionContentPass(params: {
+  controller: ReadableStreamDefaultController;
+  encoder: TextEncoder;
+  generated: any;
+  researchStr: string;
+  youtubeAnalysis: any;
+  transcript: string;
+  episodeDescription: string;
+}) {
+  const { controller, encoder, generated, researchStr, youtubeAnalysis, transcript, episodeDescription } = params;
+
+  sendSSE(controller, encoder, {
+    type: "status",
+    message: "Generating descriptions and chapter titles...",
+  });
+
+  try {
+    const descriptionPattern = youtubeAnalysis?.descriptionPattern
+      ? typeof youtubeAnalysis.descriptionPattern === "string"
+        ? youtubeAnalysis.descriptionPattern
+        : JSON.stringify(youtubeAnalysis.descriptionPattern, null, 2)
+      : null;
+
+    const descSystemPrompt = buildDescriptionChapterSystemPrompt();
+    const descUserPrompt = buildDescriptionChapterUserPrompt({
+      research: researchStr,
+      descriptionPattern,
+      winningTitles: {
+        youtube: (generated.youtubeTitles || []).map((t: any) => t.title),
+        spotify: (generated.spotifyTitles || []).map((t: any) => t.title),
+      },
+      transcript,
+      episodeDescription,
+    });
+
+    const descAbort = new AbortController();
+    const descTimeout = setTimeout(() => descAbort.abort(), 120_000);
+    const descResult = await generateObject({
+      model: descriptionModel,
+      schema: descriptionChapterOutputSchema,
+      system: descSystemPrompt,
+      prompt: descUserPrompt,
+      abortSignal: descAbort.signal,
+    });
+    clearTimeout(descTimeout);
+
+    const descOutput = descResult.object;
+
+    const chapterCheck = checkChapterTitles(descOutput.chapters.map((c) => c.title));
+    if (!chapterCheck.passed) {
+      console.warn("[PASS 4] Chapter guardrail violations:", chapterCheck.violations);
+    }
+
+    generated.youtubeDescription = descOutput.youtubeDescription;
+    generated.spotifyDescription = descOutput.spotifyDescription;
+    generated.chapters = descOutput.chapters;
+    generated.descriptionSEOKeywords = descOutput.descriptionSEOKeywords;
+    generated.descriptionScore = descOutput.descriptionScore;
+    generated.chapterScore = descOutput.chapterScore;
+
+    sendSSE(controller, encoder, {
+      type: "status",
+      message: `Descriptions and ${descOutput.chapters.length} chapter titles generated.`,
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn("[PASS 4] Description generation failed:", reason);
+    sendSSE(controller, encoder, {
+      type: "status",
+      message: `[WARNING] Description generation failed: ${reason}. Titles are still available.`,
+    });
+  }
+}
+
+const targetedRegenerationSchema = generatedYouTubeTitleSchema;
+
+async function generateTargetedArchetypeTitle(params: {
+  researchStr: string;
+  ytStr: string;
+  transcript: string;
+  episodeDescription: string;
+  targetArchetype: TitleArchetype;
+  existingYoutubeTitles: YouTubeTitleItem[];
+}): Promise<YouTubeTitleItem | null> {
+  const model = geminiGenerationModel ?? generationModel;
+  const modelName = geminiGenerationModel ? "Gemini 3.1 Pro" : "GPT-5.2";
+  const existingList = params.existingYoutubeTitles
+    .map((t) => `- ${t.title}`)
+    .join("\n");
+
+  const prompt = [
+    "Generate one new YouTube title candidate and matching thumbnail text.",
+    `Archetype must be exactly: ${params.targetArchetype}.`,
+    "Do not reuse or paraphrase these existing titles:",
+    existingList || "- (none)",
+    "",
+    "Research context:",
+    params.researchStr,
+    "",
+    "YouTube channel analysis:",
+    params.ytStr,
+    "",
+    "Transcript excerpt:",
+    params.transcript.slice(0, 6000),
+    "",
+    "Episode description:",
+    params.episodeDescription,
+  ].join("\n");
+
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), 60_000);
+  try {
+    const result = await generateObject({
+      model,
+      schema: targetedRegenerationSchema,
+      system: buildGenerationSystemPrompt(),
+      prompt,
+      abortSignal: abort.signal,
+    });
+    return {
+      ...(result.object as any),
+      archetype: params.targetArchetype,
+      sourceModel: modelName,
+    };
+  } catch (err) {
+    console.warn("[REGENERATE_TITLE] Failed to generate targeted title:", err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { research, youtubeAnalysis, transcript, episodeDescription } = body;
+    const body = (await request.json()) as GenerationRequestPayload;
+    const {
+      research,
+      youtubeAnalysis,
+      transcript,
+      episodeDescription,
+      mode: requestedMode,
+      existingGeneration,
+      targetArchetype,
+    } = body;
+    const youtubeAnalysisAny = youtubeAnalysis as any;
+
+    const mode: GenerationMode = requestedMode ?? "full";
 
     if (!research || !transcript || !episodeDescription) {
       return Response.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
+    }
+
+    if (!isGenerationMode(mode)) {
+      return Response.json(
+        { error: `Invalid generation mode. Expected one of: ${GENERATION_MODES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    if (mode !== "full" && !existingGeneration) {
+      return Response.json(
+        { error: "existingGeneration is required for rerun modes" },
+        { status: 400 }
+      );
+    }
+
+    if (mode === "regenerate_title") {
+      if (!targetArchetype || !ALL_TITLE_ARCHETYPES.includes(targetArchetype as TitleArchetype)) {
+        return Response.json(
+          { error: "targetArchetype is required for regenerate_title mode" },
+          { status: 400 }
+        );
+      }
     }
 
     const encoder = new TextEncoder();
@@ -677,6 +1139,255 @@ export async function POST(request: Request) {
           // Send runId to client early so it can poll for results if the stream is cut
           if (runId) {
             sendSSE(controller, encoder, { type: "run_id", runId });
+          }
+
+          if (mode !== "full") {
+            if (!existingGeneration) {
+              throw new Error("existingGeneration is required for rerun modes.");
+            }
+
+            const base = cloneExistingGeneration(existingGeneration);
+            let allYoutubeTitles = base.youtubeTitles;
+            let allSpotifyTitles = base.spotifyTitles;
+            let allRejectedTitles = base.rejectedTitles;
+            const eliminatedYT: YouTubeTitleItem[] = [];
+            const eliminatedSP: BaseTitleItem[] = [];
+            const modelStats: ModelStatsMap = new Map();
+            let tierClassification = existingGeneration.tierClassification;
+
+            if (allYoutubeTitles.length === 0 && mode !== "recontent") {
+              throw new Error("No existing YouTube titles found for rerun mode.");
+            }
+
+            sendSSE(controller, encoder, {
+              type: "status",
+              message: `Running ${mode} mode with existing generation state...`,
+            });
+
+            if (mode === "regenerate_title") {
+              const arch = targetArchetype as TitleArchetype;
+              logger.startPass("1");
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: `Regenerating only the ${arch} YouTube title...`,
+              });
+
+              const targetIndex = allYoutubeTitles.findIndex((t) => t.archetype === arch);
+              if (targetIndex === -1) {
+                throw new Error(`No existing title found for archetype: ${arch}`);
+              }
+
+              const replacedTitle = { ...allYoutubeTitles[targetIndex] };
+              const replacement = await generateTargetedArchetypeTitle({
+                researchStr,
+                ytStr,
+                transcript,
+                episodeDescription,
+                targetArchetype: arch,
+                existingYoutubeTitles: allYoutubeTitles,
+              });
+
+              if (!replacement) {
+                throw new Error(`Failed to regenerate title for archetype: ${arch}`);
+              }
+
+              allYoutubeTitles[targetIndex] = replacement;
+              eliminatedYT.push(replacedTitle);
+              allRejectedTitles.push({
+                title: replacedTitle.title,
+                rejectionReason: `Replaced by targeted regeneration for archetype ${arch}.`,
+              });
+
+              logger.log({
+                pass: "1",
+                event: "title_rejected",
+                title: replacedTitle.title,
+                model: replacedTitle.sourceModel,
+                platform: "youtube",
+                archetype: replacedTitle.archetype,
+                scoreTotal: replacedTitle.score?.total,
+                reason: `Replaced by targeted regeneration for archetype ${arch}.`,
+              });
+              logger.log({
+                pass: "1",
+                event: "title_generated",
+                title: replacement.title,
+                model: replacement.sourceModel,
+                platform: "youtube",
+                archetype: replacement.archetype,
+              });
+              logger.endPass("1");
+
+              const source = replacement.sourceModel || "unknown";
+              modelStats.set(source, {
+                generated: 1,
+                selected: 0,
+                totalScore: 0,
+                totalThumbScore: 0,
+                timeMs: 0,
+                hadErrors: false,
+              });
+            }
+
+            if (mode === "regenerate_title" || mode === "rescore") {
+              const scoredPass = await runScoringPass({
+                controller,
+                encoder,
+                logger,
+                researchStr,
+                youtubeTitles: allYoutubeTitles,
+                spotifyTitles: allSpotifyTitles,
+              });
+              allYoutubeTitles = scoredPass.youtubeTitles;
+              allSpotifyTitles = scoredPass.spotifyTitles;
+              tierClassification =
+                scoredPass.scored?.tierClassification ?? tierClassification;
+            }
+
+            if (mode === "regenerate_title" || mode === "rerank") {
+              allYoutubeTitles = await runPairwiseRerankPass({
+                controller,
+                encoder,
+                logger,
+                episodeDescription,
+                youtubeTitles: allYoutubeTitles,
+              });
+            }
+
+            const selectionPass = mode === "recontent" ? "4" : mode === "rescore" ? "2" : "2.5";
+            for (const t of allYoutubeTitles) {
+              logger.log({
+                pass: selectionPass,
+                event: "title_selected",
+                title: t.title,
+                model: t.sourceModel,
+                platform: "youtube",
+                archetype: t.archetype,
+                scoreTotal: t.score?.total,
+                pairwiseRank: t.pairwiseRank,
+                pairwiseWins: t.pairwiseWins,
+              });
+            }
+            for (const t of allSpotifyTitles) {
+              logger.log({
+                pass: selectionPass,
+                event: "title_selected",
+                title: t.title,
+                model: t.sourceModel,
+                platform: "spotify",
+                scoreTotal: t.score?.total,
+              });
+            }
+
+            const generated: any = {
+              ...(existingGeneration as any),
+              youtubeTitles: allYoutubeTitles,
+              spotifyTitles: allSpotifyTitles,
+              rejectedTitles: allRejectedTitles,
+              tierClassification,
+            };
+
+            if (mode === "recontent") {
+              await runDescriptionContentPass({
+                controller,
+                encoder,
+                generated,
+                researchStr,
+                youtubeAnalysis: youtubeAnalysisAny,
+                transcript,
+                episodeDescription,
+              });
+            } else {
+              sendSSE(controller, encoder, {
+                type: "status",
+                message: "Kept existing descriptions and chapters for this rerun mode.",
+              });
+            }
+
+            for (const t of generated.youtubeTitles || []) {
+              const stats = modelStats.get(t.sourceModel || "");
+              if (stats) {
+                stats.selected++;
+                stats.totalScore += t.score?.total || 0;
+                stats.totalThumbScore += t.thumbnailTextScore?.total || 0;
+              }
+            }
+            for (const t of generated.spotifyTitles || []) {
+              const stats = modelStats.get(t.sourceModel || "");
+              if (stats) {
+                stats.selected++;
+                stats.totalScore += t.score?.total || 0;
+              }
+            }
+
+            const runDurationMs = Date.now() - runStartTime;
+            const totalCandidates = allYoutubeTitles.length + allSpotifyTitles.length;
+            const pipelineSummary = logger.buildSummary();
+
+            if (runId) {
+              const ytIds = await insertTitleResults(runId, generated.youtubeTitles || [], "youtube", true);
+              const spIds = await insertTitleResults(runId, generated.spotifyTitles || [], "spotify", true);
+              ytIds.forEach((id, i) => {
+                if (generated.youtubeTitles?.[i]) generated.youtubeTitles[i].titleResultId = id;
+              });
+              spIds.forEach((id, i) => {
+                if (generated.spotifyTitles?.[i]) generated.spotifyTitles[i].titleResultId = id;
+              });
+
+              const persistenceTasks: Promise<unknown>[] = [
+                updateGenerationRun(runId, {
+                  status: "complete",
+                  totalCandidatesGenerated: totalCandidates,
+                  runDurationMs,
+                }),
+                insertPipelineLogs(runId, logger.getEntries()),
+                updateRunSummary(runId, pipelineSummary),
+              ];
+
+              if (eliminatedYT.length > 0) {
+                persistenceTasks.push(
+                  insertTitleResults(
+                    runId,
+                    eliminatedYT.map((t) => ({
+                      ...t,
+                      rejectionReason: `Replaced in ${mode} mode (scored ${t.score?.total ?? "N/A"}/100)`,
+                    })),
+                    "youtube",
+                    false
+                  )
+                );
+              }
+              if (eliminatedSP.length > 0) {
+                persistenceTasks.push(
+                  insertTitleResults(
+                    runId,
+                    eliminatedSP.map((t) => ({
+                      ...t,
+                      rejectionReason: `Replaced in ${mode} mode (scored ${t.score?.total ?? "N/A"}/100)`,
+                    })),
+                    "spotify",
+                    false
+                  )
+                );
+              }
+              if (modelStats.size > 0) {
+                persistenceTasks.push(insertModelPerformance(runId, modelStats));
+              }
+
+              await Promise.all(persistenceTasks);
+            }
+
+            if (runId && supabase) {
+              try {
+                await supabase.from("generation_runs").update({ output_json: generated }).eq("id", runId);
+              } catch (err) {
+                console.warn("[DB] Error saving output_json:", err);
+              }
+            }
+
+            sendSSE(controller, encoder, { type: "pipeline_summary", summary: pipelineSummary });
+            sendSSE(controller, encoder, { type: "complete", data: generated });
+            return;
           }
 
           // === PASS 1: Multi-model parallel generation ===
@@ -1521,10 +2232,10 @@ Return the same JSON structure. Score honestly against the calibration benchmark
           });
 
           try {
-            const descriptionPattern = youtubeAnalysis?.descriptionPattern
-              ? typeof youtubeAnalysis.descriptionPattern === "string"
-                ? youtubeAnalysis.descriptionPattern
-                : JSON.stringify(youtubeAnalysis.descriptionPattern, null, 2)
+            const descriptionPattern = youtubeAnalysisAny?.descriptionPattern
+              ? typeof youtubeAnalysisAny.descriptionPattern === "string"
+                ? youtubeAnalysisAny.descriptionPattern
+                : JSON.stringify(youtubeAnalysisAny.descriptionPattern, null, 2)
               : null;
 
             const descSystemPrompt = buildDescriptionChapterSystemPrompt();

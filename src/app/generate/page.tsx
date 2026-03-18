@@ -10,7 +10,20 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, Mic2, Sparkles } from "lucide-react";
 
 export default function GeneratePage() {
-    const { state, start, regenerate, reset, isRunning, isRegenerating } = useGenerationPipeline();
+    const {
+        state,
+        start,
+        regenerate,
+        regenerateTitle,
+        rerunPass,
+        cancel,
+        reset,
+        isRunning,
+        isRegenerating,
+        regeneratingArchetype,
+        rerunningMode,
+        activeMode,
+    } = useGenerationPipeline();
 
     return (
         <div className="min-h-screen bg-background relative">
@@ -48,16 +61,23 @@ export default function GeneratePage() {
 
                     {/* Pipeline Status */}
                     {state.step !== "idle" && state.step !== "complete" && state.step !== "error" && (
-                        <PipelineStatus
-                            step={state.step}
-                            researchStatus={state.researchStatus}
-                            youtubeStatus={state.youtubeStatus}
-                            generationStatus={state.generationStatus}
-                            error={state.error}
-                            hasResearchData={!!state.research}
-                            hasYouTubeData={!!state.youtube}
-                            hasGenerationData={!!state.generation}
-                        />
+                        <div className="space-y-3">
+                            <PipelineStatus
+                                step={state.step}
+                                researchStatus={state.researchStatus}
+                                youtubeStatus={state.youtubeStatus}
+                                generationStatus={state.generationStatus}
+                                error={state.error}
+                                hasResearchData={!!state.research}
+                                hasYouTubeData={!!state.youtube}
+                                hasGenerationData={!!state.generation}
+                            />
+                            <div className="flex justify-end">
+                                <Button variant="ghost" onClick={cancel}>
+                                    Cancel Run
+                                </Button>
+                            </div>
+                        </div>
                     )}
 
                     {/* Pipeline Trace — visible during generation and collapsed after completion */}
@@ -82,6 +102,12 @@ export default function GeneratePage() {
                     {/* Results */}
                     {state.step === "complete" && state.generation && (
                         <>
+                            {state.error && (
+                                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                                    {state.error}
+                                </div>
+                            )}
+
                             {/* Pipeline Summary — stats, weak dims, model breakdown */}
                             {state.pipelineSummary && (
                                 <PipelineSummary summary={state.pipelineSummary} />
@@ -90,7 +116,13 @@ export default function GeneratePage() {
                             <ResultsDashboard
                                 data={state.generation}
                                 onRegenerate={regenerate}
+                                onRegenerateTitle={regenerateTitle}
+                                onRerunPass={rerunPass}
+                                onCancel={cancel}
                                 isRegenerating={isRegenerating}
+                                activeMode={activeMode}
+                                regeneratingArchetype={regeneratingArchetype}
+                                rerunningMode={rerunningMode}
                                 guestName={state.research?.guest?.name}
                             />
 

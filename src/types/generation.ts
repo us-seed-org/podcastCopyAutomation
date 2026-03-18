@@ -40,6 +40,9 @@ export interface RejectedTitle {
   rejectionReason: string;
 }
 
+export type GenerationMode = "full" | "regenerate_title" | "rescore" | "rerank" | "recontent";
+export type RerunMode = Exclude<GenerationMode, "full" | "regenerate_title">;
+
 export type TitleArchetype = "authority_shocking" | "mechanism_outcome" | "curiosity_gap" | "negative_contrarian";
 export type ThumbnailArchetype = "gut_punch" | "label" | "alarm" | "confrontation";
 
@@ -83,4 +86,14 @@ export interface GenerationOutput {
   descriptionSEOKeywords?: string[];
   descriptionScore?: DescriptionScore;
   chapterScore?: ChapterScore;
+}
+
+export interface GenerationRequestPayload {
+  research: unknown;
+  youtubeAnalysis?: unknown;
+  transcript: string;
+  episodeDescription: string;
+  mode?: GenerationMode;
+  existingGeneration?: GenerationOutput;
+  targetArchetype?: TitleArchetype;
 }

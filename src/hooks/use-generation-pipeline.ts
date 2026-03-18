@@ -1,13 +1,21 @@
 "use client";
 
-import { useReducer, useCallback, useRef } from "react";
-import type { PipelineState, PipelineAction, FormInput } from "@/types/pipeline";
+import { useReducer, useCallback, useRef, useState } from "react";
+import type { PipelineAction, PipelineState, FormInput } from "@/types/pipeline";
 import type { ResearchOutput } from "@/types/research";
 import type { YouTubeAnalysis } from "@/types/youtube";
-import type { GenerationOutput } from "@/types/generation";
+import type {
+  GenerationOutput,
+  GenerationRequestPayload,
+  GenerationMode,
+  RerunMode,
+  TitleArchetype,
+} from "@/types/generation";
+import type { PipelineSummary, PipelineTraceEntry } from "@/types/pipeline-trace";
 
 const initialState: PipelineState = {
   step: "idle",
+  activeMode: null,
   researchStatus: "",
   youtubeStatus: "",
   generationStatus: "",
@@ -26,6 +34,7 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
       return {
         ...initialState,
         step: "research",
+        activeMode: "full",
         researchStatus: "Starting research...",
         youtubeStatus: "Fetching channel data...",
       };
@@ -39,7 +48,14 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         step: state.youtube !== null || !state.youtubeStatus ? "generation" : state.step,
       };
     case "RESEARCH_ERROR":
-      return { ...state, step: "error", error: `Research failed: ${action.error}`, researchStatus: "Failed", isRegenerating: false };
+      return {
+        ...state,
+        step: "error",
+        activeMode: null,
+        error: `Research failed: ${action.error}`,
+        researchStatus: "Failed",
+        isRegenerating: false,
+      };
     case "YOUTUBE_STATUS":
       return { ...state, youtubeStatus: action.status };
     case "YOUTUBE_COMPLETE":
@@ -50,7 +66,6 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         step: state.research !== null ? "generation" : state.step,
       };
     case "YOUTUBE_ERROR":
-      // YouTube is non-critical — continue without it
       return {
         ...state,
         youtube: null,
@@ -65,29 +80,55 @@ function pipelineReducer(state: PipelineState, action: PipelineAction): Pipeline
         generation: action.data,
         generationStatus: "Generation complete",
         step: "complete",
+        activeMode: null,
         isRegenerating: false,
       };
     case "GENERATION_ERROR":
-      return { ...state, step: "error", error: `Generation failed: ${action.error}`, generationStatus: "Failed", isRegenerating: false };
+      if (action.preserveResults && state.generation) {
+        return {
+          ...state,
+          step: "complete",
+          activeMode: null,
+          error: `Generation failed: ${action.error}`,
+          generationStatus: "Failed",
+          isRegenerating: false,
+        };
+      }
+      return {
+        ...state,
+        step: "error",
+        activeMode: null,
+        error: `Generation failed: ${action.error}`,
+        generationStatus: "Failed",
+        isRegenerating: false,
+      };
     case "RESET":
       return initialState;
     case "REGENERATE":
       return {
         ...state,
-        step: "generation",
-        generation: null,
-        generationStatus: "Regenerating...",
+        step: state.generation ? "complete" : "generation",
+        activeMode: action.mode,
+        generationStatus: action.status,
         error: null,
         isRegenerating: true,
         traceEntries: [],
         pipelineSummary: null,
       };
-    case "PIPELINE_TRACE": {
+    case "CANCEL":
+      return {
+        ...state,
+        step: state.generation ? "complete" : "idle",
+        activeMode: null,
+        generationStatus: "Cancelled.",
+        error: null,
+        isRegenerating: false,
+      };
+    case "PIPELINE_TRACE":
       return {
         ...state,
         traceEntries: [...state.traceEntries, action.entry],
       };
-    }
     case "PIPELINE_SUMMARY":
       return {
         ...state,
@@ -102,6 +143,37 @@ interface SSEResult {
   receivedComplete: boolean;
   receivedError: boolean;
   runId: string | null;
+}
+
+function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}
+
+async function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return;
+  }
+  if (signal.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 async function readSSEStream(
@@ -178,16 +250,24 @@ async function pollForResult(
     onError: (msg: string) => void;
     onSummary?: (summary: unknown) => void;
   },
-  maxAttempts = 120, // 120 * 3s = 6 minutes max
-  intervalMs = 3000,
+  options?: {
+    signal?: AbortSignal;
+    maxAttempts?: number;
+    intervalMs?: number;
+  }
 ): Promise<void> {
+  const maxAttempts = options?.maxAttempts ?? 120;
+  const intervalMs = options?.intervalMs ?? 3000;
+
   callbacks.onStatus("Stream interrupted — polling for results (pipeline still running on server)...");
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
+    await sleepWithAbort(intervalMs, options?.signal);
 
     try {
-      const res = await fetch(`/api/generate/status?runId=${runId}`);
+      const res = await fetch(`/api/generate/status?runId=${runId}`, {
+        signal: options?.signal,
+      });
       if (!res.ok) continue;
 
       const data = await res.json();
@@ -202,9 +282,9 @@ async function pollForResult(
         callbacks.onError("Pipeline failed on server");
         return;
       }
-      // Still running — update status
       callbacks.onStatus(`Pipeline still running on server (${attempt + 1}/${maxAttempts})...`);
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) throw err;
       // Network error during poll — continue trying
     }
   }
@@ -214,33 +294,54 @@ async function pollForResult(
 
 export function useGenerationPipeline() {
   const [state, dispatch] = useReducer(pipelineReducer, initialState);
+  const [regeneratingArchetype, setRegeneratingArchetype] = useState<TitleArchetype | null>(null);
+  const [rerunningMode, setRerunningMode] = useState<RerunMode | null>(null);
+
   const lastInputRef = useRef<FormInput | null>(null);
   const researchRef = useRef<ResearchOutput | null>(null);
   const youtubeRef = useRef<YouTubeAnalysis | null>(null);
+  const activeControllersRef = useRef<Set<AbortController>>(new Set());
+  const cancelledRef = useRef(false);
+
+  const createAbortController = useCallback(() => {
+    const controller = new AbortController();
+    activeControllersRef.current.add(controller);
+    return controller;
+  }, []);
+
+  const releaseAbortController = useCallback((controller: AbortController) => {
+    activeControllersRef.current.delete(controller);
+  }, []);
+
+  const abortAllActive = useCallback(() => {
+    for (const controller of activeControllersRef.current) {
+      controller.abort();
+    }
+    activeControllersRef.current.clear();
+  }, []);
 
   const runGeneration = useCallback(
     async (
-      research: ResearchOutput,
-      youtube: YouTubeAnalysis | null,
-      formInput: FormInput
+      payload: GenerationRequestPayload,
+      options?: { preserveResultsOnError?: boolean }
     ) => {
-      dispatch({ type: "GENERATION_STATUS", status: "Generating copy..." });
+      const controller = createAbortController();
 
       try {
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            research,
-            youtubeAnalysis: youtube,
-            transcript: formInput.transcript,
-            episodeDescription: formInput.episodeDescription,
-          }),
+          body: JSON.stringify(payload),
+          signal: controller.signal,
         });
 
         if (!res.ok) {
           const err = await res.json();
-          dispatch({ type: "GENERATION_ERROR", error: err.error || "Generation request failed" });
+          dispatch({
+            type: "GENERATION_ERROR",
+            error: err.error || "Generation request failed",
+            preserveResults: options?.preserveResultsOnError,
+          });
           return;
         }
 
@@ -249,49 +350,87 @@ export function useGenerationPipeline() {
         const sseResult = await readSSEStream(res, {
           onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
           onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data: data as GenerationOutput }),
-          onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
+          onError: (msg) =>
+            dispatch({
+              type: "GENERATION_ERROR",
+              error: msg,
+              preserveResults: options?.preserveResultsOnError,
+            }),
           onTrace: (entry: unknown) => {
             if (entry && typeof entry === "object") {
-              const entryObj = entry as Partial<import("@/types/pipeline-trace").PipelineTraceEntry>;
+              const entryObj = entry as Partial<PipelineTraceEntry>;
               dispatch({
                 type: "PIPELINE_TRACE",
-                entry: { ...entryObj, id: entryObj.id ?? crypto.randomUUID() } as import("@/types/pipeline-trace").PipelineTraceEntry
+                entry: {
+                  ...entryObj,
+                  id: entryObj.id ?? crypto.randomUUID(),
+                } as PipelineTraceEntry,
               });
             }
           },
-          onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
-          onRunId: (id) => { capturedRunId = id; },
+          onSummary: (summary) =>
+            dispatch({
+              type: "PIPELINE_SUMMARY",
+              summary: summary as PipelineSummary,
+            }),
+          onRunId: (id) => {
+            capturedRunId = id;
+          },
         });
 
-        // If the stream ended without complete/error and we have a runId,
-        // the server is likely still processing (Netlify timeout cut the stream).
-        // Fall back to polling the status endpoint.
-        if (!sseResult.receivedComplete && !sseResult.receivedError && capturedRunId) {
-          await pollForResult(capturedRunId, {
-            onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
-            onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data }),
-            onError: (msg) => dispatch({ type: "GENERATION_ERROR", error: msg }),
-            onSummary: (summary) => dispatch({ type: "PIPELINE_SUMMARY", summary: summary as import("@/types/pipeline-trace").PipelineSummary }),
-          });
+        if (
+          !sseResult.receivedComplete &&
+          !sseResult.receivedError &&
+          capturedRunId
+        ) {
+          await pollForResult(
+            capturedRunId,
+            {
+              onStatus: (msg) => dispatch({ type: "GENERATION_STATUS", status: msg }),
+              onComplete: (data) => dispatch({ type: "GENERATION_COMPLETE", data }),
+              onError: (msg) =>
+                dispatch({
+                  type: "GENERATION_ERROR",
+                  error: msg,
+                  preserveResults: options?.preserveResultsOnError,
+                }),
+              onSummary: (summary) =>
+                dispatch({
+                  type: "PIPELINE_SUMMARY",
+                  summary: summary as PipelineSummary,
+                }),
+            },
+            { signal: controller.signal }
+          );
         } else if (!sseResult.receivedComplete && !sseResult.receivedError) {
-          // Stream cut but no runId — can't poll, show error
           dispatch({
             type: "GENERATION_ERROR",
-            error: "Connection lost — the server stream ended before completing. This usually means the hosting platform terminated the request.",
+            error:
+              "Connection lost — the server stream ended before completing. This usually means the hosting platform terminated the request.",
+            preserveResults: options?.preserveResultsOnError,
           });
         }
       } catch (err) {
+        if (isAbortError(err)) return;
         dispatch({
           type: "GENERATION_ERROR",
           error: err instanceof Error ? err.message : "Generation failed",
+          preserveResults: options?.preserveResultsOnError,
         });
+      } finally {
+        releaseAbortController(controller);
       }
     },
-    []
+    [createAbortController, releaseAbortController]
   );
 
   const start = useCallback(
     async (formInput: FormInput) => {
+      cancelledRef.current = false;
+      abortAllActive();
+      setRegeneratingArchetype(null);
+      setRerunningMode(null);
+
       lastInputRef.current = formInput;
       researchRef.current = null;
       youtubeRef.current = null;
@@ -301,13 +440,20 @@ export function useGenerationPipeline() {
       let youtubeDone = false;
 
       const checkAndRunGeneration = () => {
+        if (cancelledRef.current) return;
         if (researchDone && youtubeDone && researchRef.current) {
-          runGeneration(researchRef.current, youtubeRef.current, formInput);
+          runGeneration({
+            research: researchRef.current,
+            youtubeAnalysis: youtubeRef.current,
+            transcript: formInput.transcript,
+            episodeDescription: formInput.episodeDescription,
+            mode: "full",
+          });
         }
       };
 
-      // Run research and YouTube analysis in parallel
       const researchPromise = (async () => {
+        const controller = createAbortController();
         try {
           const res = await fetch("/api/research", {
             method: "POST",
@@ -320,6 +466,7 @@ export function useGenerationPipeline() {
               coHosts: formInput.coHosts,
               targetAudience: formInput.targetAudience,
             }),
+            signal: controller.signal,
           });
 
           if (!res.ok) {
@@ -339,10 +486,13 @@ export function useGenerationPipeline() {
             onError: (msg) => dispatch({ type: "RESEARCH_ERROR", error: msg }),
           });
         } catch (err) {
+          if (isAbortError(err)) return;
           dispatch({
             type: "RESEARCH_ERROR",
             error: err instanceof Error ? err.message : "Research failed",
           });
+        } finally {
+          releaseAbortController(controller);
         }
       })();
 
@@ -354,6 +504,7 @@ export function useGenerationPipeline() {
           return;
         }
 
+        const controller = createAbortController();
         try {
           const res = await fetch("/api/youtube-analysis", {
             method: "POST",
@@ -362,6 +513,7 @@ export function useGenerationPipeline() {
               channelUrl: formInput.youtubeChannelUrl,
               podcastTopic: formInput.episodeDescription,
             }),
+            signal: controller.signal,
           });
 
           if (!res.ok) {
@@ -381,36 +533,134 @@ export function useGenerationPipeline() {
           youtubeDone = true;
           checkAndRunGeneration();
         } catch (err) {
+          if (isAbortError(err)) return;
           dispatch({
             type: "YOUTUBE_ERROR",
             error: err instanceof Error ? err.message : "YouTube analysis failed",
           });
           youtubeDone = true;
           checkAndRunGeneration();
+        } finally {
+          releaseAbortController(controller);
         }
       })();
 
       await Promise.all([researchPromise, youtubePromise]);
     },
-    [runGeneration]
+    [abortAllActive, createAbortController, releaseAbortController, runGeneration]
+  );
+
+  const buildGenerationPayload = useCallback(
+    (
+      mode: GenerationMode,
+      generation: GenerationOutput,
+      targetArchetype?: TitleArchetype
+    ): GenerationRequestPayload | null => {
+      if (!researchRef.current || !lastInputRef.current) return null;
+
+      return {
+        research: researchRef.current,
+        youtubeAnalysis: youtubeRef.current,
+        transcript: lastInputRef.current.transcript,
+        episodeDescription: lastInputRef.current.episodeDescription,
+        mode,
+        existingGeneration: generation,
+        targetArchetype,
+      };
+    },
+    []
   );
 
   const regenerate = useCallback(async () => {
-    if (!researchRef.current || !lastInputRef.current) return;
-    dispatch({ type: "REGENERATE" });
-    await runGeneration(researchRef.current, youtubeRef.current, lastInputRef.current);
-  }, [runGeneration]);
+    if (!state.generation) return;
+    const payload = buildGenerationPayload("full", state.generation);
+    if (!payload) return;
+
+    cancelledRef.current = false;
+    abortAllActive();
+    setRegeneratingArchetype(null);
+    setRerunningMode(null);
+    dispatch({ type: "REGENERATE", mode: "full", status: "Regenerating all passes..." });
+    await runGeneration(payload, { preserveResultsOnError: true });
+  }, [abortAllActive, buildGenerationPayload, runGeneration, state.generation]);
+
+  const regenerateTitle = useCallback(
+    async (archetype: TitleArchetype) => {
+      if (!state.generation) return;
+      const payload = buildGenerationPayload("regenerate_title", state.generation, archetype);
+      if (!payload) return;
+
+      cancelledRef.current = false;
+      abortAllActive();
+      setRegeneratingArchetype(archetype);
+      setRerunningMode(null);
+      dispatch({
+        type: "REGENERATE",
+        mode: "regenerate_title",
+        status: `Regenerating ${archetype} title...`,
+      });
+      try {
+        await runGeneration(payload, { preserveResultsOnError: true });
+      } finally {
+        setRegeneratingArchetype(null);
+      }
+    },
+    [abortAllActive, buildGenerationPayload, runGeneration, state.generation]
+  );
+
+  const rerunPass = useCallback(
+    async (mode: RerunMode) => {
+      if (!state.generation) return;
+      const payload = buildGenerationPayload(mode, state.generation);
+      if (!payload) return;
+
+      cancelledRef.current = false;
+      abortAllActive();
+      setRegeneratingArchetype(null);
+      setRerunningMode(mode);
+      const statusMap: Record<RerunMode, string> = {
+        rescore: "Re-running scoring...",
+        rerank: "Re-running pairwise ranking...",
+        recontent: "Re-running descriptions and chapters...",
+      };
+      dispatch({ type: "REGENERATE", mode, status: statusMap[mode] });
+      try {
+        await runGeneration(payload, { preserveResultsOnError: true });
+      } finally {
+        setRerunningMode(null);
+      }
+    },
+    [abortAllActive, buildGenerationPayload, runGeneration, state.generation]
+  );
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true;
+    abortAllActive();
+    setRegeneratingArchetype(null);
+    setRerunningMode(null);
+    dispatch({ type: "CANCEL" });
+  }, [abortAllActive]);
 
   const reset = useCallback(() => {
+    cancelledRef.current = false;
+    abortAllActive();
+    setRegeneratingArchetype(null);
+    setRerunningMode(null);
     dispatch({ type: "RESET" });
-  }, []);
+  }, [abortAllActive]);
 
   return {
     state,
     start,
     regenerate,
+    regenerateTitle,
+    rerunPass,
+    cancel,
     reset,
     isRunning: state.step !== "idle" && state.step !== "complete" && state.step !== "error",
     isRegenerating: state.isRegenerating,
+    regeneratingArchetype,
+    rerunningMode,
+    activeMode: state.activeMode,
   };
 }

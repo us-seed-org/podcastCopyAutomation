@@ -1,5 +1,5 @@
 import type { ResearchOutput } from "./research";
-import type { GenerationOutput } from "./generation";
+import type { GenerationOutput, GenerationMode } from "./generation";
 import type { YouTubeAnalysis } from "./youtube";
 import type { PipelineTraceEntry, PipelineSummary } from "./pipeline-trace";
 
@@ -7,6 +7,7 @@ export type PipelineStep = "idle" | "research" | "youtube" | "generation" | "com
 
 export interface PipelineState {
   step: PipelineStep;
+  activeMode: GenerationMode | null;
   researchStatus: string;
   youtubeStatus: string;
   generationStatus: string;
@@ -40,9 +41,9 @@ export type PipelineAction =
   | { type: "YOUTUBE_ERROR"; error: string }
   | { type: "GENERATION_STATUS"; status: string }
   | { type: "GENERATION_COMPLETE"; data: GenerationOutput }
-  | { type: "GENERATION_ERROR"; error: string }
+  | { type: "GENERATION_ERROR"; error: string; preserveResults?: boolean }
   | { type: "RESET" }
-  | { type: "REGENERATE" }
+  | { type: "REGENERATE"; mode: GenerationMode; status: string }
+  | { type: "CANCEL" }
   | { type: "PIPELINE_TRACE"; entry: PipelineTraceEntry }
   | { type: "PIPELINE_SUMMARY"; summary: PipelineSummary };
-
