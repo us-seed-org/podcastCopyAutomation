@@ -132,8 +132,8 @@ export async function runPairwiseTournament(
       } finally {
         clearTimeout(timeout);
         signal?.removeEventListener("abort", onAbort);
-        completedCount++;
         try {
+          completedCount++;
           onProgress?.(completedCount, comparisons.length);
         } catch (progressErr) {
           console.error("[Pairwise] onProgress callback error:", progressErr);

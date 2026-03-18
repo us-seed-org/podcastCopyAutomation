@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { generateObject, generateText } from "ai";
 import { generationModel, minimaxGenerationModel, kimiModel, scoringModel, geminiScoringModel, pairwiseJudgeModel, geminiGenerationModel, descriptionModel } from "@/lib/ai";
 import {
@@ -319,7 +320,8 @@ async function fetchBenchmarks(limit = 5): Promise<string> {
 async function scoreWithPanel(
   titlesToScore: { youtubeTitles: any[]; spotifyTitles: any[] },
   research: string,
-  scoringPrompt: string
+  scoringPrompt: string,
+  signal?: AbortSignal
 ): Promise<any> {
   const scoringInput = buildScoringUserPrompt({
     generatedTitles: JSON.stringify(titlesToScore, null, 2),
@@ -339,13 +341,22 @@ async function scoreWithPanel(
     scorers.map((s) => {
       const ctrl = new AbortController();
       const tm = setTimeout(() => ctrl.abort(), SCORING_CALL_TIMEOUT_MS);
+      if (signal?.aborted) {
+        clearTimeout(tm);
+        throw new Error("Aborted");
+      }
+      const onAbort = () => ctrl.abort();
+      signal?.addEventListener("abort", onAbort);
       return generateObject({
         model: s.model,
         schema: scoringOutputSchema,
         system: scoringPrompt,
         prompt: scoringInput,
         abortSignal: ctrl.signal,
-      }).finally(() => clearTimeout(tm));
+      }).finally(() => {
+        clearTimeout(tm);
+        signal?.removeEventListener("abort", onAbort);
+      });
     })
   );
 
@@ -759,12 +770,13 @@ async function runScoringPass(params: {
   researchStr: string;
   youtubeTitles: YouTubeTitleItem[];
   spotifyTitles: BaseTitleItem[];
+  signal?: AbortSignal;
 }): Promise<{
   youtubeTitles: YouTubeTitleItem[];
   spotifyTitles: BaseTitleItem[];
   scored: any;
 }> {
-  const { controller, encoder, logger, researchStr } = params;
+  const { controller, encoder, logger, researchStr, signal } = params;
   let { youtubeTitles, spotifyTitles } = params;
 
   logger.startPass("2");
@@ -782,7 +794,8 @@ async function runScoringPass(params: {
     scored = await scoreWithPanel(
       toScoreInput(youtubeTitles, spotifyTitles),
       researchStr,
-      scoringPrompt
+      scoringPrompt,
+      signal
     );
   } catch (err) {
     console.warn("[PASS 2] Scoring panel failed:", err);
@@ -997,6 +1010,7 @@ async function generateTargetedArchetypeTitle(params: {
   episodeDescription: string;
   targetArchetype: TitleArchetype;
   existingYoutubeTitles: YouTubeTitleItem[];
+  signal?: AbortSignal;
 }): Promise<YouTubeTitleItem | null> {
   const model = geminiGenerationModel ?? generationModel;
   const modelName = geminiGenerationModel ? "Gemini 3.1 Pro" : "GPT-5.2";
@@ -1025,6 +1039,12 @@ async function generateTargetedArchetypeTitle(params: {
 
   const abort = new AbortController();
   const timeout = setTimeout(() => abort.abort(), 60_000);
+  if (params.signal?.aborted) {
+    clearTimeout(timeout);
+    throw new Error("Aborted");
+  }
+  const onAbort = () => abort.abort();
+  params.signal?.addEventListener("abort", onAbort);
   try {
     const result = await generateObject({
       model,
@@ -1043,6 +1063,7 @@ async function generateTargetedArchetypeTitle(params: {
     return null;
   } finally {
     clearTimeout(timeout);
+    params.signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -1214,6 +1235,7 @@ export async function POST(request: Request) {
                 episodeDescription,
                 targetArchetype: arch,
                 existingYoutubeTitles: allYoutubeTitles,
+                signal: routeAbortCtrl.signal,
               });
 
               if (!replacement) {
@@ -1266,6 +1288,7 @@ export async function POST(request: Request) {
                 researchStr,
                 youtubeTitles: allYoutubeTitles,
                 spotifyTitles: allSpotifyTitles,
+                signal: routeAbortCtrl.signal,
               });
               allYoutubeTitles = scoredPass.youtubeTitles;
               allSpotifyTitles = scoredPass.spotifyTitles;
@@ -1638,7 +1661,7 @@ export async function POST(request: Request) {
 
           let scored: any = null;
           try {
-            scored = await scoreWithPanel(titlesToScore, researchStr, scoringPrompt);
+            scored = await scoreWithPanel(titlesToScore, researchStr, scoringPrompt, routeAbortCtrl.signal);
           } catch (err) {
             console.warn("[PASS 2] Scoring panel failed:", err);
             sendSSE(controller, encoder, {
@@ -2190,7 +2213,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
                   platformNotes: t.platformNotes,
                 })),
               };
-              rewriteScored = await scoreWithPanel(rewriteTitlesToScore, researchStr, scoringPrompt);
+              rewriteScored = await scoreWithPanel(rewriteTitlesToScore, researchStr, scoringPrompt, routeAbortCtrl.signal);
             } catch {
               console.warn(`[PASS 3] Re-scoring attempt ${attempt} failed`);
             }
