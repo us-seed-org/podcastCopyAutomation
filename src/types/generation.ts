@@ -33,6 +33,7 @@ export interface TitleOption {
   pairwiseWins?: number;
   pairwiseRank?: number;
   titleResultId?: string;
+  rewritten?: boolean;
 }
 
 export interface RejectedTitle {

@@ -1110,23 +1110,25 @@ export async function POST(request: Request) {
       );
     }
 
-    if (mode === "rescore") {
-      const existingYoutubeTitles = existingGeneration?.youtubeTitles || [];
-      const existingSpotifyTitles = existingGeneration?.spotifyTitles || [];
-      const hasScores = existingYoutubeTitles.some((t) => t.score !== undefined);
-      if (existingYoutubeTitles.length === 0 && existingSpotifyTitles.length === 0) {
-        return Response.json(
-          { error: "No YouTube or Spotify titles found in existingGeneration for rescore mode" },
-          { status: 400 }
-        );
-      }
-      if (!hasScores) {
-        return Response.json(
-          { error: "Existing titles must have scores before rescore. Run a full pipeline first." },
-          { status: 400 }
-        );
-      }
+if (mode === "rescore") {
+    const existingYoutubeTitles = existingGeneration?.youtubeTitles || [];
+    const existingSpotifyTitles = existingGeneration?.spotifyTitles || [];
+    const hasYoutubeScores = existingYoutubeTitles.length === 0 || existingYoutubeTitles.some((t) => t.score !== undefined);
+    const hasSpotifyScores = existingSpotifyTitles.length === 0 || existingSpotifyTitles.some((t) => t.score !== undefined);
+    const hasScores = hasYoutubeScores && hasSpotifyScores;
+    if (existingYoutubeTitles.length === 0 && existingSpotifyTitles.length === 0) {
+      return Response.json(
+        { error: "No YouTube or Spotify titles found in existingGeneration for rescore mode" },
+        { status: 400 }
+      );
     }
+    if (!hasScores) {
+      return Response.json(
+        { error: "Existing titles must have scores before rescore. Run a full pipeline first." },
+        { status: 400 }
+      );
+    }
+  }
 
     if (mode === "regenerate_title") {
       if (!targetArchetype || !ALL_TITLE_ARCHETYPES.includes(targetArchetype as TitleArchetype)) {
