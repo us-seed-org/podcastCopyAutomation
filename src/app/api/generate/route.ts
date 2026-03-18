@@ -1205,6 +1205,23 @@ export async function POST(request: Request) {
             const eliminatedYT: YouTubeTitleItem[] = [];
             const eliminatedSP: BaseTitleItem[] = [];
             const modelStats: ModelStatsMap = new Map();
+            const existingModels = new Set<string>();
+            for (const t of allYoutubeTitles) {
+              if (t.sourceModel) existingModels.add(t.sourceModel);
+            }
+            for (const t of allSpotifyTitles) {
+              if (t.sourceModel) existingModels.add(t.sourceModel);
+            }
+            for (const model of existingModels) {
+              modelStats.set(model, {
+                generated: 0,
+                selected: 0,
+                totalScore: 0,
+                totalThumbScore: 0,
+                timeMs: 0,
+                hadErrors: false,
+              });
+            }
             let tierClassification = existingGeneration.tierClassification;
 
             if (allYoutubeTitles.length === 0 && mode !== "recontent") {
