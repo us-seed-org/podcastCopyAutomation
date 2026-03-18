@@ -880,7 +880,11 @@ async function runPairwiseRerankPass(params: {
           const ranked = rankedWithOrder.find(
             (candidate) => normalizeTitle(candidate.title) === normalizeTitle(t.title)
           );
-          if (!ranked) return t;
+          if (!ranked) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { pairwiseRank, pairwiseWins, ...rest } = t;
+            return rest as YouTubeTitleItem;
+          }
           logger.log({
             pass: "2.5",
             event: "pairwise_result",
@@ -1930,7 +1934,9 @@ export async function POST(request: Request) {
                     });
                     return { ...t, pairwiseWins: ranked.pairwiseWins, pairwiseRank: ranked.pairwiseRank };
                   }
-                  return t;
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  const { pairwiseRank, pairwiseWins, ...rest } = t;
+                  return rest as YouTubeTitleItem;
                 });
               }
             } catch (error) {
