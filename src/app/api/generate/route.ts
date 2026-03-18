@@ -809,8 +809,9 @@ async function runPairwiseRerankPass(params: {
   logger: PipelineLogger;
   episodeDescription: string;
   youtubeTitles: YouTubeTitleItem[];
+  signal?: AbortSignal;
 }): Promise<YouTubeTitleItem[]> {
-  const { controller, encoder, logger, episodeDescription } = params;
+  const { controller, encoder, logger, episodeDescription, signal } = params;
   let { youtubeTitles } = params;
   let pairwiseSucceeded = false;
 
@@ -840,7 +841,8 @@ async function runPairwiseRerankPass(params: {
               message: `Pairwise tournament: ${completed}/${total} comparisons complete...`,
             });
           }
-        }
+        },
+        signal
       );
 
       if (tournament) {
@@ -1105,6 +1107,8 @@ export async function POST(request: Request) {
     }
 
     const encoder = new TextEncoder();
+    const routeAbortCtrl = new AbortController();
+    request.signal.addEventListener("abort", () => routeAbortCtrl.abort());
     const stream = new ReadableStream({
       async start(controller) {
         const runStartTime = Date.now();
@@ -1251,7 +1255,7 @@ export async function POST(request: Request) {
               });
             }
 
-            if (mode === "regenerate_title" || mode === "rescore") {
+            if (mode === "regenerate_title" || mode === "rescore" || mode === "rerank") {
               const scoredPass = await runScoringPass({
                 controller,
                 encoder,
@@ -1277,6 +1281,7 @@ export async function POST(request: Request) {
                 logger,
                 episodeDescription,
                 youtubeTitles: allYoutubeTitles,
+                signal: routeAbortCtrl.signal,
               });
             }
 
@@ -1838,7 +1843,8 @@ export async function POST(request: Request) {
                       message: `Pairwise tournament: ${completed}/${total} comparisons complete...`,
                     });
                   }
-                }
+                },
+                routeAbortCtrl.signal
               );
 
               if (tournament) {

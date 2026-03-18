@@ -442,13 +442,16 @@ export function useGenerationPipeline() {
       const checkAndRunGeneration = () => {
         if (cancelledRef.current) return;
         if (researchDone && youtubeDone && researchRef.current) {
-          runGeneration({
-            research: researchRef.current,
-            youtubeAnalysis: youtubeRef.current,
-            transcript: formInput.transcript,
-            episodeDescription: formInput.episodeDescription,
-            mode: "full",
-          });
+          runGeneration(
+            {
+              research: researchRef.current,
+              youtubeAnalysis: youtubeRef.current,
+              transcript: formInput.transcript,
+              episodeDescription: formInput.episodeDescription,
+              mode: "full",
+            },
+            { preserveResultsOnError: true }
+          );
         }
       };
 

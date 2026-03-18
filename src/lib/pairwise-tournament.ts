@@ -55,7 +55,8 @@ export async function runPairwiseTournament(
   youtubeTitles: TitleWithScore[],
   episodeDescription: string,
   topN: number = 5,
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number) => void,
+  signal?: AbortSignal
 ): Promise<TournamentResult | null> {
   const judgeModel = pairwiseJudgeModel;
   if (!judgeModel) {
@@ -107,6 +108,12 @@ export async function runPairwiseTournament(
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), PAIRWISE_CALL_TIMEOUT_MS);
+      if (signal?.aborted) {
+        clearTimeout(timeout);
+        throw new Error("Aborted");
+      }
+      const onAbort = () => controller.abort();
+      signal?.addEventListener("abort", onAbort);
       try {
         const result = await generateObject({
           model: judgeModel,
@@ -124,6 +131,7 @@ export async function runPairwiseTournament(
         return { ...comp, winner: result.object.winner };
       } finally {
         clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
         completedCount++;
         try {
           onProgress?.(completedCount, comparisons.length);
