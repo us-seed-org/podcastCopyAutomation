@@ -341,12 +341,13 @@ async function scoreWithPanel(
     scorers.map((s) => {
       const ctrl = new AbortController();
       const tm = setTimeout(() => ctrl.abort(), SCORING_CALL_TIMEOUT_MS);
-      if (signal?.aborted) {
-        clearTimeout(tm);
-        throw new Error("Aborted");
-      }
       const onAbort = () => ctrl.abort();
       signal?.addEventListener("abort", onAbort);
+      if (signal?.aborted) {
+        clearTimeout(tm);
+        signal?.removeEventListener("abort", onAbort);
+        throw new Error("Aborted");
+      }
       return generateObject({
         model: s.model,
         schema: scoringOutputSchema,
@@ -1039,12 +1040,13 @@ async function generateTargetedArchetypeTitle(params: {
 
   const abort = new AbortController();
   const timeout = setTimeout(() => abort.abort(), 60_000);
-  if (params.signal?.aborted) {
-    clearTimeout(timeout);
-    throw new Error("Aborted");
-  }
   const onAbort = () => abort.abort();
   params.signal?.addEventListener("abort", onAbort);
+  if (params.signal?.aborted) {
+    clearTimeout(timeout);
+    params.signal?.removeEventListener("abort", onAbort);
+    throw new Error("Aborted");
+  }
   try {
     const result = await generateObject({
       model,
