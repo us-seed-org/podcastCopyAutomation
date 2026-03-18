@@ -1242,6 +1242,10 @@ export async function POST(request: Request) {
               allSpotifyTitles = scoredPass.spotifyTitles;
               tierClassification =
                 scoredPass.scored?.tierClassification ?? tierClassification;
+              if (mode === "rescore") {
+                allYoutubeTitles.sort((a, b) => (b.score?.total || 0) - (a.score?.total || 0));
+                allSpotifyTitles.sort((a, b) => (b.score?.total || 0) - (a.score?.total || 0));
+              }
             }
 
             if (mode === "regenerate_title" || mode === "rerank") {
