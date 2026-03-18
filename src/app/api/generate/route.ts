@@ -812,6 +812,7 @@ async function runPairwiseRerankPass(params: {
 }): Promise<YouTubeTitleItem[]> {
   const { controller, encoder, logger, episodeDescription } = params;
   let { youtubeTitles } = params;
+  let pairwiseSucceeded = false;
 
   logger.startPass("2.5");
   if (pairwiseJudgeModel && youtubeTitles.length > 1) {
@@ -843,6 +844,7 @@ async function runPairwiseRerankPass(params: {
       );
 
       if (tournament) {
+        pairwiseSucceeded = true;
         const rankedTitles = tournament.titles.map((t, idx) => ({
           ...t,
           pairwiseWins: tournament.wins.get(idx) || 0,
@@ -889,7 +891,10 @@ async function runPairwiseRerankPass(params: {
     }
   }
 
-  const hasPairwiseData = youtubeTitles.some((t) => t.pairwiseRank !== undefined);
+  if (!pairwiseSucceeded) {
+    youtubeTitles = youtubeTitles.map(({ pairwiseRank: _pr, pairwiseWins: _pw, ...t }) => t);
+  }
+  const hasPairwiseData = pairwiseSucceeded;
   youtubeTitles.sort((a, b) => {
     if (hasPairwiseData) {
       if (a.pairwiseRank !== undefined && b.pairwiseRank !== undefined) {
@@ -1791,6 +1796,7 @@ export async function POST(request: Request) {
 
           // === PASS 2.5: Pairwise Tournament ===
           logger.startPass("2.5");
+          let pairwiseSucceeded = false;
           if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
             sendSSE(controller, encoder, {
               type: "status",
@@ -1819,6 +1825,7 @@ export async function POST(request: Request) {
               );
 
               if (tournament) {
+                pairwiseSucceeded = true;
                 sendSSE(controller, encoder, {
                   type: "status",
                   message: `${tournament.consistentPairs}/${(PAIRWISE_TOP_N * (PAIRWISE_TOP_N - 1)) / 2} unique pairs had consistent results`,
@@ -1868,7 +1875,10 @@ export async function POST(request: Request) {
           }
 
           // === Selection ===
-          const hasPairwiseData = allYoutubeTitles.some((t: any) => t.pairwiseRank !== undefined);
+          if (!pairwiseSucceeded) {
+            allYoutubeTitles = allYoutubeTitles.map(({ pairwiseRank: _pr, pairwiseWins: _pw, ...t }) => t);
+          }
+          const hasPairwiseData = pairwiseSucceeded;
           allYoutubeTitles.sort((a: any, b: any) => {
             if (hasPairwiseData) {
               if (a.pairwiseRank !== undefined && b.pairwiseRank !== undefined) {
