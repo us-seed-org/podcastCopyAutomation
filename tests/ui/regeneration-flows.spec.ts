@@ -155,11 +155,13 @@ function buildSSE(output: unknown, runId: string) {
   return events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createModeOutput(mode: string, payload: any) {
   const output = structuredClone(BASE_OUTPUT);
 
   if (mode === "regenerate_title") {
     const arch = payload.targetArchetype;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const idx = output.youtubeTitles.findIndex((t: any) => t.archetype === arch);
     if (idx >= 0) {
       output.youtubeTitles[idx] = {
@@ -171,10 +173,12 @@ function createModeOutput(mode: string, payload: any) {
   }
 
   if (mode === "rescore") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output.youtubeTitles = output.youtubeTitles.map((t: any, i: number) => ({
       ...t,
       score: { ...t.score, total: 80 - i },
     }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output.spotifyTitles = output.spotifyTitles.map((t: any, i: number) => ({
       ...t,
       score: { ...t.score, total: 78 - i },
@@ -182,6 +186,7 @@ function createModeOutput(mode: string, payload: any) {
   }
 
   if (mode === "rerank") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output.youtubeTitles = output.youtubeTitles.map((t: any, i: number) => ({
       ...t,
       pairwiseRank: output.youtubeTitles.length - i,
@@ -245,6 +250,7 @@ test.describe("Regeneration flows", () => {
   test("per-title regenerate sends regenerate_title mode with archetype and existing generation", async ({
     page,
   }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const requests: any[] = [];
 
     await setupCoreMocks(page);
@@ -275,6 +281,7 @@ test.describe("Regeneration flows", () => {
   test("rerun buttons send rescore, rerank, and recontent modes with existing generation", async ({
     page,
   }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const requests: any[] = [];
 
     await setupCoreMocks(page);
@@ -311,6 +318,7 @@ test.describe("Regeneration flows", () => {
   });
 
   test("cancel stops an in-flight rerun and restores controls", async ({ page }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const requests: any[] = [];
 
     await setupCoreMocks(page);

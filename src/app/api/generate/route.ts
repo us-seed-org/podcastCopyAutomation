@@ -1111,11 +1111,12 @@ export async function POST(request: Request) {
     }
 
     if (mode === "rescore") {
-      const existingTitles = existingGeneration?.youtubeTitles || [];
-      const hasScores = existingTitles.some((t) => t.score !== undefined);
-      if (existingTitles.length === 0) {
+      const existingYoutubeTitles = existingGeneration?.youtubeTitles || [];
+      const existingSpotifyTitles = existingGeneration?.spotifyTitles || [];
+      const hasScores = existingYoutubeTitles.some((t) => t.score !== undefined);
+      if (existingYoutubeTitles.length === 0 && existingSpotifyTitles.length === 0) {
         return Response.json(
-          { error: "No YouTube titles found in existingGeneration for rescore mode" },
+          { error: "No YouTube or Spotify titles found in existingGeneration for rescore mode" },
           { status: 400 }
         );
       }
@@ -1207,7 +1208,6 @@ export async function POST(request: Request) {
             let allSpotifyTitles = base.spotifyTitles;
             const allRejectedTitles = base.rejectedTitles;
             const eliminatedYT: YouTubeTitleItem[] = [];
-            const eliminatedSP: BaseTitleItem[] = [];
             const modelStats: ModelStatsMap = new Map();
             const existingModels = new Set<string>();
             for (const t of allYoutubeTitles) {
@@ -1230,6 +1230,10 @@ export async function POST(request: Request) {
 
             if (allYoutubeTitles.length === 0 && mode !== "recontent") {
               throw new Error("No existing YouTube titles found for rerun mode.");
+            }
+
+            if (allSpotifyTitles.length === 0 && mode !== "recontent") {
+              throw new Error("No existing Spotify titles found for rerun mode.");
             }
 
             sendSSE(controller, encoder, {
@@ -1433,19 +1437,6 @@ export async function POST(request: Request) {
                       rejectionReason: `Replaced in ${mode} mode (scored ${t.score?.total ?? "N/A"}/100)`,
                     })),
                     "youtube",
-                    false
-                  )
-                );
-              }
-              if (eliminatedSP.length > 0) {
-                persistenceTasks.push(
-                  insertTitleResults(
-                    runId,
-                    eliminatedSP.map((t) => ({
-                      ...t,
-                      rejectionReason: `Replaced in ${mode} mode (scored ${t.score?.total ?? "N/A"}/100)`,
-                    })),
-                    "spotify",
                     false
                   )
                 );

@@ -38,6 +38,7 @@ test.describe("Human Feedback Component", () => {
 
     test("save button sends request to /api/rate", async ({ page }) => {
         // Set up route interception for /api/rate
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let rateRequestBody: any = null;
         await page.route("**/api/rate", async (route) => {
             const request = route.request();

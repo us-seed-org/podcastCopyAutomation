@@ -5,12 +5,6 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  {
-    rules: {
-      // AI/LLM response shapes are inherently unknown at compile time.
-      "@typescript-eslint/no-explicit-any": "off",
-    },
-  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     ".next/**",

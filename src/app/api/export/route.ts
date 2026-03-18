@@ -194,6 +194,7 @@ export async function GET(request: Request) {
       }
 
       if (run.pipeline_summary) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let ps: any = null;
         try {
           ps = typeof run.pipeline_summary === "string" ? JSON.parse(run.pipeline_summary) : run.pipeline_summary;
@@ -205,6 +206,7 @@ export async function GET(request: Request) {
           lines.push(`- Generated: ${ps.totalGenerated ?? "N/A"} | Selected: ${ps.totalSelected ?? "N/A"} | Rewrite Rate: ${ps.rewriteRate ?? "N/A"}%`);
           lines.push(`- Duration: ${ps.totalDurationMs ?? "N/A"}ms`);
           if (ps.weakDimensions?.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             lines.push(`- Weak Dimensions: ${ps.weakDimensions.map((d: any) => d.dimension).join(", ")}`);
           }
           lines.push("");
