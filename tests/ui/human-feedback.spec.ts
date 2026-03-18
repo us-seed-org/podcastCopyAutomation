@@ -11,11 +11,6 @@ test.describe("Human Feedback Component", () => {
     test("star rating is clickable and updates display", async ({ page }) => {
         // Look for star rating buttons (rendered after a generation completes with titleResultIds)
         const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
-
-        // Stars only render when titleResultId is present on a title
-        const starCount = await stars.count();
-
-        // Click the 4th star (index 3)
         await stars.nth(3).click();
 
         // The rating display should show "4/5"
@@ -24,8 +19,7 @@ test.describe("Human Feedback Component", () => {
 
     test("notes input expands after rating", async ({ page }) => {
         const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
-        const starCount = await stars.count();
-        if (starCount === 0) {
+        if ((await stars.count()) === 0) {
             test.fixme(true, "Prerequisite: A completed generation with titleResultIds is required");
             return;
         }
@@ -56,7 +50,6 @@ test.describe("Human Feedback Component", () => {
         });
 
         const stars = page.locator("button").filter({ has: page.locator("svg.lucide-star") });
-        const starCount = await stars.count();
 
         // Click 3rd star
         await stars.nth(2).click();

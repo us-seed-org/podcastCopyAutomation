@@ -211,7 +211,8 @@ export function ThumbnailGenerator({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Image className="h-5 w-5 text-purple-500" />
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <span aria-hidden="true"><Image className="h-5 w-5 text-purple-500" /></span>
           <h3 className="text-lg font-semibold">Thumbnail Generator</h3>
         </div>
         {state.stage !== "idle" && (

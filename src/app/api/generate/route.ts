@@ -49,7 +49,6 @@ function normalizeTitle(title: string): string {
 }
 
 const ALL_TITLE_ARCHETYPES: TitleArchetype[] = ["authority_shocking", "mechanism_outcome", "curiosity_gap", "negative_contrarian"];
-const ALL_THUMBNAIL_ARCHETYPES: ThumbnailArchetype[] = ["gut_punch", "label", "alarm", "confrontation"];
 
 /**
  * Select 4 YouTube titles ensuring archetype diversity.
@@ -894,7 +893,11 @@ async function runPairwiseRerankPass(params: {
   }
 
   if (!pairwiseSucceeded) {
-    youtubeTitles = youtubeTitles.map(({ pairwiseRank: _pr, pairwiseWins: _pw, ...t }) => t);
+    youtubeTitles = youtubeTitles.map((t) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pairwiseRank, pairwiseWins, ...rest } = t;
+      return rest as Omit<YouTubeTitleItem, "pairwiseRank" | "pairwiseWins">;
+    });
   }
   const hasPairwiseData = pairwiseSucceeded;
   youtubeTitles.sort((a, b) => {
@@ -1175,7 +1178,7 @@ export async function POST(request: Request) {
             const base = cloneExistingGeneration(existingGeneration);
             let allYoutubeTitles = base.youtubeTitles;
             let allSpotifyTitles = base.spotifyTitles;
-            let allRejectedTitles = base.rejectedTitles;
+            const allRejectedTitles = base.rejectedTitles;
             const eliminatedYT: YouTubeTitleItem[] = [];
             const eliminatedSP: BaseTitleItem[] = [];
             const modelStats: ModelStatsMap = new Map();
@@ -1453,7 +1456,7 @@ export async function POST(request: Request) {
           // Merge successful results
           let allYoutubeTitles: YouTubeTitleItem[] = [];
           let allSpotifyTitles: BaseTitleItem[] = [];
-          let allRejectedTitles: ScoredTitle[] = [];
+          const allRejectedTitles: ScoredTitle[] = [];
           const succeededModels: string[] = [];
           const modelStats = new Map<string, { generated: number; selected: number; totalScore: number; totalThumbScore: number; timeMs: number; hadErrors: boolean; errorMsg?: string }>();
 
@@ -1899,7 +1902,11 @@ export async function POST(request: Request) {
 
           // === Selection ===
           if (!pairwiseSucceeded) {
-            allYoutubeTitles = allYoutubeTitles.map(({ pairwiseRank: _pr, pairwiseWins: _pw, ...t }) => t);
+            allYoutubeTitles = allYoutubeTitles.map((t) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { pairwiseRank, pairwiseWins, ...rest } = t;
+              return rest as Omit<YouTubeTitleItem, "pairwiseRank" | "pairwiseWins">;
+            });
           }
           const hasPairwiseData = pairwiseSucceeded;
           allYoutubeTitles.sort((a: any, b: any) => {

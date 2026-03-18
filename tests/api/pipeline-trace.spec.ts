@@ -53,8 +53,9 @@ test.describe("Pipeline Trace SSE Events", () => {
         if (currentData) {
             try {
                 events.push(JSON.parse(currentData));
-            } catch (err) {
-                // ignore
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                } catch (_err) {
+                    // ignore
             }
         }
         return events;
