@@ -1078,6 +1078,23 @@ export async function POST(request: Request) {
       );
     }
 
+    if (mode === "rescore") {
+      const existingTitles = existingGeneration?.youtubeTitles || [];
+      const hasScores = existingTitles.some((t) => t.score !== undefined);
+      if (existingTitles.length === 0) {
+        return Response.json(
+          { error: "No YouTube titles found in existingGeneration for rescore mode" },
+          { status: 400 }
+        );
+      }
+      if (!hasScores) {
+        return Response.json(
+          { error: "Existing titles must have scores before rescore. Run a full pipeline first." },
+          { status: 400 }
+        );
+      }
+    }
+
     if (mode === "regenerate_title") {
       if (!targetArchetype || !ALL_TITLE_ARCHETYPES.includes(targetArchetype as TitleArchetype)) {
         return Response.json(
