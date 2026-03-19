@@ -314,6 +314,7 @@ test.describe("Regeneration flows", () => {
       await expect(page.getByRole("button", { name: rerun.label })).toBeEnabled();
     }
 
+    await page.getByRole("tab", { name: /Descriptions/i }).click();
     await expect(page.getByText("Updated YouTube description from recontent.")).toBeVisible();
   });
 
