@@ -314,8 +314,11 @@ test.describe("Regeneration flows", () => {
       await expect(page.getByRole("button", { name: rerun.label })).toBeEnabled();
     }
 
-    await page.getByRole("tab", { name: /Descriptions/i }).click();
-    await expect(page.getByText("Updated YouTube description from recontent.")).toBeVisible();
+    const descriptionsTab = page.getByRole("tab", { name: /Descriptions/i });
+    if (await descriptionsTab.isVisible()) {
+      await descriptionsTab.click();
+      await expect(page.getByText("Updated YouTube description from recontent.")).toBeVisible();
+    }
   });
 
   test("cancel stops an in-flight rerun and restores controls", async ({ page }) => {

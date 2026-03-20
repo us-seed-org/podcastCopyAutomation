@@ -85,7 +85,7 @@ export function TitleCard({
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 border-b border-border/50 pb-4">
           <div className="flex flex-wrap items-center gap-2">
             {isWinner && (
-              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
+              <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
                 <Crown className="h-3 w-3" /> Winner
               </span>
             )}

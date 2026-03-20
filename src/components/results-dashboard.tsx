@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { TitleCard } from "@/components/title-card";
 import { ScoreComparison } from "@/components/score-comparison";
 import { CopyButton } from "@/components/copy-button";
@@ -169,7 +169,6 @@ export function ResultsDashboard({
               Thumbnails
             </TabsTrigger>
           </TabsList>
-          <ScrollBar orientation="horizontal" className="invisible" />
         </ScrollArea>
 
         <TabsContent value="youtube" className="mt-4 space-y-8 outline-none focus-visible:ring-0">
@@ -180,7 +179,7 @@ export function ResultsDashboard({
                 title={title}
                 platform="youtube"
                 index={i}
-                isWinner={i === 0 || title.pairwiseRank === 1}
+                isWinner={i === 0}
                 onRegenerateTarget={onRegenerateTitle}
                 isRegeneratingTarget={regeneratingArchetype === title.archetype}
                 disableRegenerate={isActionRunning && regeneratingArchetype !== title.archetype}
