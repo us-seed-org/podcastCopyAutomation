@@ -9,8 +9,9 @@ import { ScoreBreakdownChart } from "@/components/score-breakdown";
 import { ThumbnailTextScoreChart } from "@/components/thumbnail-text-score";
 import { CopyButton } from "@/components/copy-button";
 import { HumanFeedback } from "@/components/human-feedback";
-import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, Image as ImageIcon, RefreshCw, Crown } from "lucide-react";
 import type { TitleOption, TitleArchetype, ThumbnailArchetype } from "@/types/generation";
+import { cn } from "@/lib/utils";
 
 const archetypeLabels: Record<TitleArchetype, string> = {
   authority_shocking: "Authority + Shocking",
@@ -40,6 +41,7 @@ interface TitleCardProps {
   onRegenerateTarget?: (archetype: TitleArchetype) => void;
   isRegeneratingTarget?: boolean;
   disableRegenerate?: boolean;
+  isWinner?: boolean;
 }
 
 const platformStyles = {
@@ -62,17 +64,31 @@ export function TitleCard({
   onRegenerateTarget,
   isRegeneratingTarget,
   disableRegenerate,
+  isWinner,
 }: TitleCardProps) {
   const [open, setOpen] = useState(false);
   const style = platformStyles[platform];
   const charCount = title.title.length;
 
   return (
-    <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5">
-      <div className={`h-1 bg-gradient-to-r ${style.accent}`} />
+    <Card className={cn(
+      "overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5",
+      isWinner && "ring-2 ring-primary bg-primary/5"
+    )}>
+      {isWinner ? (
+        <div className="h-1 bg-primary" />
+      ) : (
+        <div className={`h-1 bg-gradient-to-r ${style.accent}`} />
+      )}
+      
       <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 border-b border-border/50 pb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {isWinner && (
+              <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground shadow-sm">
+                <Crown className="h-3 w-3" /> Winner
+              </span>
+            )}
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${style.badge}`}>
               {style.label} #{index + 1}
             </span>
@@ -84,27 +100,52 @@ export function TitleCard({
                 #{title.pairwiseRank}({title.pairwiseWins}W)
               </span>
             )}
+            <ScoreBadge score={title.score.total} />
           </div>
-          <ScoreBadge score={title.score.total} />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <CopyButton text={title.title} label="Title" />
+            
+            {platform === "youtube" && title.thumbnailText && (
+              <CopyButton text={title.thumbnailText} label="Thumb" />
+            )}
+
+            {platform === "youtube" && title.archetype && onRegenerateTarget && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 px-2.5 text-xs focus-visible:ring-1"
+                disabled={disableRegenerate || isRegeneratingTarget}
+                onClick={() => onRegenerateTarget(title.archetype!)}
+              >
+                <RefreshCw className={`h-3 w-3 ${isRegeneratingTarget ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">{isRegeneratingTarget ? "Working..." : "Regen"}</span>
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Archetype Badges */}
-        {(title.archetype || title.thumbnailArchetype) && (
-          <div className="flex items-center gap-1.5 mb-3">
-            {title.archetype && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                {archetypeLabels[title.archetype]}
-              </span>
-            )}
-            {title.thumbnailArchetype && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${thumbArchetypeColors[title.thumbnailArchetype]}`}>
-                {thumbArchetypeLabels[title.thumbnailArchetype]}
-              </span>
-            )}
-          </div>
-        )}
+        <div className="mb-4">
+          {(title.archetype || title.thumbnailArchetype) && (
+            <div className="flex items-center gap-1.5 mb-3">
+              {title.archetype && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {archetypeLabels[title.archetype]}
+                </span>
+              )}
+              {title.thumbnailArchetype && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${thumbArchetypeColors[title.thumbnailArchetype]}`}>
+                  {thumbArchetypeLabels[title.thumbnailArchetype]}
+                </span>
+              )}
+            </div>
+          )}
 
-        {/* Thumbnail Text — YouTube only */}
+          <p className="text-lg font-semibold leading-snug text-foreground/95">
+            {title.title}
+          </p>
+        </div>
+
         {platform === "youtube" && title.thumbnailText && (
           <div className="mb-4">
             <div className="flex items-center gap-1.5 mb-2">
@@ -116,18 +157,11 @@ export function TitleCard({
                 <ScoreBadge score={title.thumbnailTextScore.total} showLabel={false} />
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="bg-red-500/80 text-white font-black text-xl tracking-wide px-4 py-2.5 rounded-lg shadow-sm uppercase leading-tight">
-                {title.thumbnailText}
-              </div>
-              <CopyButton text={title.thumbnailText} label="Copy" />
+            <div className="bg-red-500/80 text-white font-black text-xl tracking-wide px-4 py-2.5 rounded-lg shadow-sm uppercase leading-tight w-fit">
+              {title.thumbnailText}
             </div>
           </div>
         )}
-
-        <p className="text-lg font-semibold leading-snug mb-4 text-foreground/95">
-          {title.title}
-        </p>
 
         {(title.scrollStopReason || title.emotionalTrigger) && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -152,24 +186,10 @@ export function TitleCard({
         )}
 
         <Collapsible open={open} onOpenChange={setOpen}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CopyButton text={title.title} label="Copy Title" />
-              {platform === "youtube" && title.archetype && onRegenerateTarget && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 px-2.5 text-xs"
-                  disabled={disableRegenerate || isRegeneratingTarget}
-                  onClick={() => onRegenerateTarget(title.archetype!)}
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isRegeneratingTarget ? "animate-spin" : ""}`} />
-                  {isRegeneratingTarget ? "Regenerating..." : "Regenerate"}
-                </Button>
-              )}
-            </div>
-
-            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+          <div className="flex items-center justify-between border-t border-border/50 pt-3 mt-1">
+            <HumanFeedback titleResultId={title.titleResultId} />
+            
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-auto">
               Score Breakdown
               {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </CollapsibleTrigger>
@@ -185,7 +205,6 @@ export function TitleCard({
                 <ThumbnailTextScoreChart score={title.thumbnailTextScore} />
               </div>
             )}
-            <HumanFeedback titleResultId={title.titleResultId} />
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
