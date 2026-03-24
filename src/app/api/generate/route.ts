@@ -329,10 +329,10 @@ async function scoreWithPanel(
   });
 
   const scorers: Array<{ model: any; name: string }> = [
-    { model: scoringModel, name: "GPT-5.2" },
+    { model: scoringModel(), name: "GPT-5.2" },
   ];
-  if (geminiScoringModel) {
-    scorers.push({ model: geminiScoringModel, name: "Gemini 3.1 Pro" });
+  if (geminiScoringModel()) {
+    scorers.push({ model: geminiScoringModel(), name: "Gemini 3.1 Pro" });
   }
 
   const SCORING_CALL_TIMEOUT_MS = 150_000;
@@ -781,7 +781,7 @@ async function runScoringPass(params: {
   let { youtubeTitles, spotifyTitles } = params;
 
   logger.startPass("2");
-  const scorerNames = geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
+  const scorerNames = geminiScoringModel() ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
   sendSSE(controller, encoder, {
     type: "status",
     message: `Scoring ${youtubeTitles.length} YouTube + ${spotifyTitles.length} Spotify titles with ${scorerNames}...`,
@@ -829,7 +829,7 @@ async function runPairwiseRerankPass(params: {
   let pairwiseSucceeded = false;
 
   logger.startPass("2.5");
-  if (pairwiseJudgeModel && youtubeTitles.length > 1) {
+  if (pairwiseJudgeModel() && youtubeTitles.length > 1) {
     const topN = Math.min(PAIRWISE_TOP_N, youtubeTitles.length);
     const totalPairs = (topN * (topN - 1)) / 2;
     sendSSE(controller, encoder, {
@@ -970,7 +970,7 @@ async function runDescriptionContentPass(params: {
     const descAbort = new AbortController();
     const descTimeout = setTimeout(() => descAbort.abort(), 120_000);
     const descResult = await generateObject({
-      model: descriptionModel,
+      model: descriptionModel(),
       schema: descriptionChapterOutputSchema,
       system: descSystemPrompt,
       prompt: descUserPrompt,
@@ -1017,8 +1017,8 @@ async function generateTargetedArchetypeTitle(params: {
   existingYoutubeTitles: YouTubeTitleItem[];
   signal?: AbortSignal;
 }): Promise<YouTubeTitleItem | null> {
-  const model = geminiGenerationModel ?? generationModel;
-  const modelName = geminiGenerationModel ? "Gemini 3.1 Pro" : "GPT-5.2";
+  const model = geminiGenerationModel() ?? generationModel();
+  const modelName = geminiGenerationModel() ? "Gemini 3.1 Pro" : "GPT-5.2";
   const existingList = params.existingYoutubeTitles
     .map((t) => `- ${t.title}`)
     .join("\n");
@@ -1178,11 +1178,14 @@ if (mode === "rescore") {
 
           // === DB: Insert generation run ===
           const models: GenerationModelConfig[] = [
-            { model: geminiGenerationModel ?? generationModel, name: geminiGenerationModel ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
-            { model: generationModel, name: "GPT-5.2" },
-            { model: minimaxGenerationModel, name: "Minimax M2.5" },
-            ...(kimiModel ? [{ model: kimiModel, name: "Kimi K2.5" }] : []),
+            { model: geminiGenerationModel() ?? generationModel(), name: geminiGenerationModel() ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
+            { model: generationModel(), name: "GPT-5.2" },
+            { model: minimaxGenerationModel(), name: "Minimax M2.5" },
           ];
+          const kimi = kimiModel();
+          if (kimi) {
+            models.push({ model: kimi, name: "Kimi K2.5" });
+          }
 
           runId = await insertGenerationRun({
             podcastName,
@@ -1191,8 +1194,8 @@ if (mode === "rescore") {
             guestTier,
             transcriptCharCount: transcript.length,
             modelsUsed: models.map((m) => m.name),
-            scoringModel: geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2",
-            pairwiseEnabled: !!pairwiseJudgeModel,
+            scoringModel: geminiScoringModel() ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2",
+            pairwiseEnabled: !!pairwiseJudgeModel(),
           });
 
           // Send runId to client early so it can poll for results if the stream is cut
@@ -1648,7 +1651,7 @@ if (mode === "rescore") {
 
           // === PASS 2: Dual-scorer panel ===
           logger.startPass("2");
-          const scorerNames = geminiScoringModel ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
+          const scorerNames = geminiScoringModel() ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2";
           sendSSE(controller, encoder, {
             type: "status",
             message: `Scoring ${allYoutubeTitles.length} YouTube + ${allSpotifyTitles.length} Spotify titles with ${scorerNames}...`,
@@ -1779,7 +1782,7 @@ if (mode === "rescore") {
             const hotTakeTemperature = researchObj?.transcript?.hotTakeTemperature || "warm";
 
             try {
-              const thumbRefineModel = geminiGenerationModel ?? generationModel;
+              const thumbRefineModel = geminiGenerationModel() ?? generationModel();
               const thumbRefineCtrl = new AbortController();
               const thumbRefineTimeout = setTimeout(() => thumbRefineCtrl.abort(), 30_000);
 
@@ -1861,7 +1864,7 @@ if (mode === "rescore") {
           // === PASS 2.5: Pairwise Tournament ===
           logger.startPass("2.5");
           let pairwiseSucceeded = false;
-          if (pairwiseJudgeModel && allYoutubeTitles.length > 4) {
+          if (pairwiseJudgeModel() && allYoutubeTitles.length > 4) {
             sendSSE(controller, encoder, {
               type: "status",
               message: `Running pairwise tournament on top ${PAIRWISE_TOP_N} YouTube titles with Gemini (${(PAIRWISE_TOP_N * (PAIRWISE_TOP_N - 1)) / 2} unique pairs)...`,
@@ -2167,10 +2170,10 @@ ${weakSP.length > 0 ? `Generate ${weakSP.length} NEW Spotify ${weakSP.length ===
 Return the same JSON structure. Score honestly against the calibration benchmarks.`;
 
             let rewritten: any = null;
-            const rewriteModelName = geminiGenerationModel ? "Gemini 3.1 Pro (rewrite)" : "Gemini 3.0 Flash (rewrite)";
+            const rewriteModelName = geminiGenerationModel() ? "Gemini 3.1 Pro (rewrite)" : "Gemini 3.0 Flash (rewrite)";
             try {
               const rewriteGenResult = await generateWithModel(
-                { model: geminiGenerationModel ?? generationModel, name: rewriteModelName },
+                { model: geminiGenerationModel() ?? generationModel(), name: rewriteModelName },
                 systemPrompt,
                 rewriteInput
               );
@@ -2338,7 +2341,7 @@ Return the same JSON structure. Score honestly against the calibration benchmark
             const descAbort = new AbortController();
             const descTimeout = setTimeout(() => descAbort.abort(), 120_000);
             const descResult = await generateObject({
-              model: descriptionModel,
+              model: descriptionModel(),
               schema: descriptionChapterOutputSchema,
               system: descSystemPrompt,
               prompt: descUserPrompt,

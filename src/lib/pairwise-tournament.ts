@@ -58,7 +58,7 @@ export async function runPairwiseTournament(
   onProgress?: (completed: number, total: number) => void,
   signal?: AbortSignal
 ): Promise<TournamentResult | null> {
-  const judgeModel = pairwiseJudgeModel;
+  const judgeModel = pairwiseJudgeModel();
   if (!judgeModel) {
     console.log("[Pairwise] No pairwiseJudgeModel configured, skipping tournament");
     return null;

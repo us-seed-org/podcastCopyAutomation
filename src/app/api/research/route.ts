@@ -1,6 +1,6 @@
 import { generateObject, generateText, stepCountIs } from "ai";
 import { z } from "zod";
-import { researchModel, openaiProvider } from "@/lib/ai";
+import { researchModel, getOpenAIProvider } from "@/lib/ai";
 import { buildResearchSystemPrompt, buildResearchUserPrompt } from "@/lib/prompts/research-system";
 import { researchOutputSchema } from "@/lib/schemas/research-output";
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
           let extractedHotTakes: Array<{ quote: string; topic: string; whyClickable: string; type: string }> = [];
           try {
             const hotTakeResult = await generateObject({
-              model: researchModel,
+              model: researchModel(),
               schema: hotTakeExtractionSchema,
               system: `You extract the most clickable hot takes from podcast transcripts.
 A hot take is a moment that would make someone STOP scrolling — a contrarian claim, shocking stat, bold prediction, debunking, or provocative opinion.
@@ -188,11 +188,11 @@ Each hot take must be anchored in a specific quote or claim, not a vague summary
           // Use generateText with web search tool — research needs web_search
           // which is OpenAI-specific, so we use generateText and parse the JSON
           const result = await generateText({
-            model: researchModel,
+            model: researchModel(),
             system: systemPrompt,
             prompt: userPrompt,
             tools: {
-              web_search_preview: openaiProvider.tools.webSearchPreview({}),
+              web_search_preview: getOpenAIProvider().tools.webSearchPreview({}),
             },
             stopWhen: stepCountIs(2),
           });

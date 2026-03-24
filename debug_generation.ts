@@ -26,7 +26,7 @@ async function run() {
     });
 
     const res = await generateObject({
-        model: generationModel,
+        model: generationModel(),
         schema: titleGenerationOutputSchema,
         system: sys,
         prompt: usr,
@@ -43,7 +43,7 @@ async function run() {
     });
 
     const scores = await generateObject({
-        model: scoringModel,
+        model: scoringModel(),
         schema: scoringOutputSchema,
         system: ssys,
         prompt: susr,
