@@ -44,7 +44,6 @@
     "playwright": "^1.58.2",
     "shadcn": "^3.8.4",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "wrangler": "^3.0.0"
+    "typescript": "^5"
   }
 }
