@@ -76,6 +76,48 @@ Do NOT remove guardrails, tier system, or anti-hallucination rules. Expand const
 - Guardrails: `src/lib/guardrails/[name].ts`
 - Tests: `tests/api/` and `tests/ui/`
 
+## gstack Skills — Auto-Use Policy
+
+Skills are installed at `~/.claude/skills/`. Use the `Skill` tool to invoke them. **Do NOT wait for the user to type a slash command — invoke proactively whenever the trigger condition is met.**
+
+### ALWAYS invoke automatically (no user prompt needed)
+
+| Skill | Invoke when |
+|---|---|
+| `/investigate` | Any bug, error, unexpected behavior, or "why isn't this working" — never attempt a fix without root cause first |
+| `/careful` | Any destructive operation: `DROP TABLE`, migrations, `rm -rf`, `git reset --hard`, prod data changes |
+| `/review` | After completing any set of code changes, before suggesting a commit or PR |
+| `/qa` | After implementing or fixing any UI feature — verify it actually works in the browser |
+| `/design-review` | After any component or UI change — visual QA before declaring done |
+| `/plan-eng-review` | Whenever a plan or architecture is being discussed before writing code — catch issues early |
+| `/cso` | When adding auth, API endpoints, handling user data, modifying env vars, or any security-adjacent change |
+
+### Proactively suggest (confirm with user before running)
+
+| Skill | Suggest when |
+|---|---|
+| `/ship` | User signals code is ready, says "done", or asks about deploying/merging |
+| `/autoplan` | Starting a multi-step feature — full review pipeline before coding |
+| `/plan-ceo-review` | Strategic or product-level decisions being made |
+| `/plan-design-review` | UI feature planned but not yet built |
+| `/canary` | After a deployment — suggest post-deploy monitoring |
+| `/retro` | After completing a significant feature or sprint |
+| `/document-release` | After shipping — suggest updating docs |
+| `/codex` | Complex architectural decision — suggest second opinion |
+| `/benchmark` | Performance-sensitive code changes |
+| `/office-hours` | User is stuck on strategy, direction, or product decisions |
+
+### Manual-only (only run when user explicitly invokes)
+
+`/gstack`, `/browse`, `/land-and-deploy`, `/freeze`, `/unfreeze`, `/guard`, `/setup-deploy`, `/setup-browser-cookies`, `/gstack-upgrade`
+
+### Rules
+
+1. **Every conversation**: At the start of each session, scan the context for any applicable auto-invoke triggers above and run them before proceeding with other work.
+2. **Never skip `/review`** after code changes — it is mandatory before any commit suggestion.
+3. **Never skip `/investigate`** when debugging — no fixes without root cause.
+4. **Skill files**: `/Users/rohan/.claude/skills/<skillname>/SKILL.md` — read these if you need to understand what a skill does before invoking.
+
 ## Environment Variables
 
 Required: `OPENAI_API_KEY`, `MINIMAX_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
