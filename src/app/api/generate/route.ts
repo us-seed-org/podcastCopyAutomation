@@ -26,6 +26,7 @@ import { runPairwiseTournament } from "@/lib/pairwise-tournament";
 import { supabase } from "@/lib/supabase";
 import { PipelineLogger } from "@/lib/pipeline-logger";
 import type { GenerationMode, GenerationOutput, GenerationRequestPayload } from "@/types/generation";
+import type { ChannelConfig } from "@/types/channel-config";
 import type { PipelineTraceEntry } from "@/types/pipeline-trace";
 
 export const runtime = "nodejs";
@@ -452,6 +453,9 @@ async function insertGenerationRun(data: {
   modelsUsed: string[];
   scoringModel: string;
   pairwiseEnabled: boolean;
+  channelConfigId?: string | null;
+  researchJson?: unknown;
+  transcriptText?: string;
 }): Promise<string | null> {
   if (!supabase) return null;
   try {
@@ -467,6 +471,9 @@ async function insertGenerationRun(data: {
         scoring_model: data.scoringModel,
         pairwise_enabled: data.pairwiseEnabled,
         status: "running",
+        ...(data.channelConfigId ? { channel_config_id: data.channelConfigId } : {}),
+        ...(data.researchJson !== undefined ? { research_json: data.researchJson } : {}),
+        ...(data.transcriptText !== undefined ? { transcript_text: data.transcriptText } : {}),
       })
       .select("id")
       .single();
@@ -1015,6 +1022,7 @@ async function generateTargetedArchetypeTitle(params: {
   episodeDescription: string;
   targetArchetype: TitleArchetype;
   existingYoutubeTitles: YouTubeTitleItem[];
+  channelConfig?: ChannelConfig | null;
   signal?: AbortSignal;
 }): Promise<YouTubeTitleItem | null> {
   const model = geminiGenerationModel() ?? generationModel();
@@ -1055,7 +1063,7 @@ async function generateTargetedArchetypeTitle(params: {
     const result = await generateObject({
       model,
       schema: targetedRegenerationSchema,
-      system: buildGenerationSystemPrompt(),
+      system: buildGenerationSystemPrompt(params.channelConfig),
       prompt,
       abortSignal: abort.signal,
     });
@@ -1084,6 +1092,7 @@ export async function POST(request: Request) {
       mode: requestedMode,
       existingGeneration,
       targetArchetype,
+      channelConfigId,
     } = body;
     const youtubeAnalysisAny = youtubeAnalysis as any;
 
@@ -1176,6 +1185,21 @@ if (mode === "rescore") {
             researchObj?.guest?.authorityLabel || undefined;
           const podcastName = researchObj?.brand?.podcastName || "Unknown Podcast";
 
+          // Fetch channel config if provided
+          let channelConfig: ChannelConfig | null = null;
+          if (channelConfigId && supabase) {
+            try {
+              const { data: ccData } = await supabase
+                .from("channel_configs")
+                .select("*")
+                .eq("id", channelConfigId)
+                .single();
+              channelConfig = ccData || null;
+            } catch (ccErr) {
+              console.warn("[generate] Failed to fetch channel config:", ccErr);
+            }
+          }
+
           // === DB: Insert generation run ===
           const models: GenerationModelConfig[] = [
             { model: geminiGenerationModel() ?? generationModel(), name: geminiGenerationModel() ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
@@ -1196,6 +1220,9 @@ if (mode === "rescore") {
             modelsUsed: models.map((m) => m.name),
             scoringModel: geminiScoringModel() ? "GPT-5.2 + Gemini 3.1 Pro (panel)" : "GPT-5.2",
             pairwiseEnabled: !!pairwiseJudgeModel(),
+            channelConfigId: channelConfig?.id ?? null,
+            researchJson: researchObj,
+            transcriptText: transcript,
           });
 
           // Send runId to client early so it can poll for results if the stream is cut
@@ -1267,6 +1294,7 @@ if (mode === "rescore") {
                 episodeDescription,
                 targetArchetype: arch,
                 existingYoutubeTitles: allYoutubeTitles,
+                channelConfig,
                 signal: routeAbortCtrl.signal,
               });
 
@@ -1468,7 +1496,7 @@ if (mode === "rescore") {
 
           // === PASS 1: Multi-model parallel generation ===
           logger.startPass("1");
-          const systemPrompt = buildGenerationSystemPrompt();
+          const systemPrompt = buildGenerationSystemPrompt(channelConfig);
           const userPrompt = buildGenerationUserPrompt({
             research: researchStr,
             youtubeAnalysis: ytStr,

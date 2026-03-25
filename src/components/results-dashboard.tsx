@@ -29,6 +29,7 @@ import type {
   TitleArchetype,
 } from "@/types/generation";
 import { ThumbnailGenerator } from "@/components/thumbnail-generator";
+import { ChatPanel } from "@/components/chat-panel";
 
 interface ResultsDashboardProps {
   data: GenerationOutput;
@@ -41,6 +42,7 @@ interface ResultsDashboardProps {
   regeneratingArchetype?: TitleArchetype | null;
   rerunningMode?: RerunMode | null;
   guestName?: string;
+  runId?: string | null;
 }
 
 function CopyAllButton({ text, label }: { text: string; label: string }) {
@@ -77,6 +79,7 @@ export function ResultsDashboard({
   regeneratingArchetype,
   rerunningMode,
   guestName,
+  runId,
 }: ResultsDashboardProps) {
   const isActionRunning = isRegenerating;
   const effectiveMode = activeMode ?? rerunningMode ?? null;
@@ -308,6 +311,14 @@ export function ResultsDashboard({
           <ThumbnailGenerator data={data} guestName={guestName} />
         </TabsContent>
       </Tabs>
+
+      {runId && (
+        <ChatPanel
+          runId={runId}
+          generation={data}
+          onActionTriggered={onRegenerate}
+        />
+      )}
     </div>
   );
 }

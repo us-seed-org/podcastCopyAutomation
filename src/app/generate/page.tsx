@@ -23,6 +23,7 @@ export default function GeneratePage() {
         regeneratingArchetype,
         rerunningMode,
         activeMode,
+        currentRunId,
     } = useGenerationPipeline();
 
     return (
@@ -124,6 +125,7 @@ export default function GeneratePage() {
                                 regeneratingArchetype={regeneratingArchetype}
                                 rerunningMode={rerunningMode}
                                 guestName={state.research?.guest?.name}
+                                runId={currentRunId}
                             />
 
                             <div className="text-center pt-4 pb-8">

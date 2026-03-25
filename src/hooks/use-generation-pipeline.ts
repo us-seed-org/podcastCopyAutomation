@@ -296,6 +296,7 @@ export function useGenerationPipeline() {
   const [state, dispatch] = useReducer(pipelineReducer, initialState);
   const [regeneratingArchetype, setRegeneratingArchetype] = useState<TitleArchetype | null>(null);
   const [rerunningMode, setRerunningMode] = useState<RerunMode | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
 
   const lastInputRef = useRef<FormInput | null>(null);
   const researchRef = useRef<ResearchOutput | null>(null);
@@ -375,6 +376,7 @@ export function useGenerationPipeline() {
             }),
           onRunId: (id) => {
             capturedRunId = id;
+            setCurrentRunId(id);
           },
         });
 
@@ -449,6 +451,7 @@ export function useGenerationPipeline() {
               transcript: formInput.transcript,
               episodeDescription: formInput.episodeDescription,
               mode: "full",
+              channelConfigId: formInput.channelConfigId,
             },
             { preserveResultsOnError: true }
           );
@@ -569,6 +572,7 @@ export function useGenerationPipeline() {
         mode,
         existingGeneration: generation,
         targetArchetype,
+        channelConfigId: lastInputRef.current.channelConfigId,
       };
     },
     []
@@ -665,5 +669,6 @@ export function useGenerationPipeline() {
     regeneratingArchetype,
     rerunningMode,
     activeMode: state.activeMode,
+    currentRunId,
   };
 }
