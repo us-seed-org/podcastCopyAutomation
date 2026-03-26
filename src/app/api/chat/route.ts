@@ -41,12 +41,12 @@ function extractSuggestedActions(text: string): SuggestedAction[] {
 }
 
 export async function POST(request: Request) {
+  const realIp = request.headers.get("x-real-ip");
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip =
-    (forwarded ? forwarded.split(",")[0].trim() : null) ||
-    request.headers.get("x-real-ip") ||
-    "anonymous";
-  if (!checkRateLimit(`chat:${ip}`, 30, 60_000)) {
+  const ip = realIp
+    ? (forwarded ? forwarded.split(",")[0].trim() : null) || realIp
+    : "anonymous";
+  if (!(await checkRateLimit(`chat:${ip}`, 30, 60_000))) {
     return Response.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
   }
 
@@ -89,9 +89,9 @@ export async function POST(request: Request) {
   }
 
   // Get or create conversation
-  let conv = conversationId
+  const conv = conversationId
     ? await (async () => {
-        const { data } = await supabase!
+        const { data } = await supabase
           .from("conversations")
           .select("*")
           .eq("id", conversationId)
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     guestTier: run.guest_tier,
     youtubeTitles,
     spotifyTitles,
-    scoresJson: youtubeTitles.length > 0 ? youtubeTitles.map(t => ({ title: t.title, score: t.score })) : undefined,
+    scoresJson: youtubeTitles.length > 0 ? youtubeTitles.map(t => ({ title: t.title, score: t.score })).slice(0, 8) : undefined,
     channelConfig,
   });
 

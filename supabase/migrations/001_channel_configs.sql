@@ -11,7 +11,7 @@ CREATE TABLE channel_configs (
 );
 
 -- Add channel_config_id to generation_runs
-ALTER TABLE generation_runs ADD COLUMN channel_config_id UUID REFERENCES channel_configs(id);
+ALTER TABLE generation_runs ADD COLUMN channel_config_id UUID REFERENCES channel_configs(id) ON DELETE SET NULL;
 
 -- Store original inputs so chat actions can re-run the pipeline
 ALTER TABLE generation_runs ADD COLUMN research_json JSONB;

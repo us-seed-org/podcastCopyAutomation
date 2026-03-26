@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const VALID_ACTION_TYPES = ["regenerate", "rescore", "rerank", "recontent"] as const;
+const VALID_ARCHETYPES = new Set(["authority_shocking", "mechanism_outcome", "curiosity_gap", "negative_contrarian"]);
 type ActionType = (typeof VALID_ACTION_TYPES)[number];
 
 function mapActionToMode(actionType: ActionType): string {
@@ -13,12 +14,12 @@ function mapActionToMode(actionType: ActionType): string {
 }
 
 export async function POST(request: Request) {
+  const realIp = request.headers.get("x-real-ip");
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip =
-    (forwarded ? forwarded.split(",")[0].trim() : null) ||
-    request.headers.get("x-real-ip") ||
-    "anonymous";
-  if (!checkRateLimit(`chat-action:${ip}`, 5, 3_600_000)) {
+  const ip = realIp
+    ? (forwarded ? forwarded.split(",")[0].trim() : null) || realIp
+    : "anonymous";
+  if (!(await checkRateLimit(`chat-action:${ip}`, 5, 3_600_000))) {
     return Response.json({ error: "Action rate limit exceeded. Try again later." }, { status: 429 });
   }
 
@@ -55,12 +56,13 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!supabase) {
+  const sb = supabase;
+  if (!sb) {
     return Response.json({ error: "Database not configured" }, { status: 503 });
   }
 
   // Validate conversation exists and is active
-  const { data: conv } = await supabase
+  const { data: conv } = await sb
     .from("conversations")
     .select("id, run_id, status")
     .eq("id", conversationId)
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
   }
 
   // Prevent double-trigger: check for in_progress actions
-  const { data: inProgress } = await supabase
+  const { data: inProgress } = await sb
     .from("conversation_actions")
     .select("id")
     .eq("conversation_id", conversationId)
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
   }
 
   // Insert action record
-  const { data: actionRow, error: insertErr } = await supabase
+  const { data: actionRow, error: insertErr } = await sb
     .from("conversation_actions")
     .insert({
       conversation_id: conversationId,
@@ -103,14 +105,14 @@ export async function POST(request: Request) {
   const actionId = actionRow.id;
 
   // Fetch run data for pipeline call
-  const { data: run } = await supabase
+  const { data: run } = await sb
     .from("generation_runs")
     .select("id, output_json, research_json, transcript_text, episode_description, channel_config_id")
     .eq("id", conv.run_id)
     .single();
 
   if (!run) {
-    await supabase
+    await sb
       .from("conversation_actions")
       .update({ status: "failed", error_message: "Run not found", completed_at: new Date().toISOString() })
       .eq("id", actionId);
@@ -118,7 +120,7 @@ export async function POST(request: Request) {
   }
 
   if (!run.research_json || !run.transcript_text || !run.episode_description) {
-    await supabase
+    await sb
       .from("conversation_actions")
       .update({ status: "failed", error_message: "Run missing input data (research_json/transcript_text)", completed_at: new Date().toISOString() })
       .eq("id", actionId);
@@ -141,7 +143,9 @@ export async function POST(request: Request) {
   };
 
   if (actionType === "regenerate" && parameters.archetype) {
-    generatePayload.targetArchetype = parameters.archetype;
+    if (VALID_ARCHETYPES.has(parameters.archetype as string)) {
+      generatePayload.targetArchetype = parameters.archetype;
+    }
   }
 
   // Execute asynchronously
@@ -171,12 +175,12 @@ export async function POST(request: Request) {
         }
       }
 
-      await supabase!
+      await sb
         .from("conversation_actions")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", actionId);
     } catch (err) {
-      await supabase!
+      await sb
         .from("conversation_actions")
         .update({
           status: "failed",

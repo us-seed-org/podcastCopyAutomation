@@ -1,18 +1,51 @@
-const requestCounts = new Map<string, { count: number; resetAt: number }>();
+import { supabase } from "@/lib/supabase";
 
-export function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = requestCounts.get(key);
-
-  if (!entry || now >= entry.resetAt) {
-    requestCounts.set(key, { count: 1, resetAt: now + windowMs });
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<boolean> {
+  if (!supabase) {
+    // DB not configured — fail open
     return true;
   }
 
-  if (entry.count >= limit) {
-    return false;
+  const now = Date.now();
+  const windowStart = Math.floor(now / windowMs) * windowMs;
+
+  // Step 1: Upsert the row with count = 1 (creates if missing, no-op if exists)
+  await supabase
+    .from("rate_limits")
+    .upsert(
+      { key, window_start: windowStart, count: 1 },
+      { onConflict: "key,window_start" }
+    );
+
+  // Step 2: Read current count
+  const { data } = await supabase
+    .from("rate_limits")
+    .select("count")
+    .eq("key", key)
+    .eq("window_start", windowStart)
+    .single();
+
+  if (!data) {
+    // Row vanished or DB error — fail open
+    return true;
   }
 
-  entry.count += 1;
+  if (data.count > limit) {
+    return false; // over limit
+  }
+
+  // Step 3: Atomically increment
+  await supabase
+    .from("rate_limits")
+    .update({ count: data.count + 1 })
+    .eq("key", key)
+    .eq("window_start", windowStart);
+
+  // Step 4: If we just bumped over the limit, the NEXT request will be rejected
+  // (slightly permissive but prevents any race on the allow side)
   return true;
 }

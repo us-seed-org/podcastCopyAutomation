@@ -138,9 +138,9 @@ test.describe("Chat API", () => {
     });
 
     // 500 = real server error — must fail the test
-    expect([200, 404]).toContain(res.status());
-
-    if (res.status() === 200) {
+    // The server should return 200 and create a new conversation when an unrecognized
+    // conversationId is passed (it falls through to getOrCreateConversation).
+    expect(res.status()).toBe(200);
       // Server created a new conversation (correct behavior — it rejected the unrecognized convId
       // because the scoped query found no match and fell through to getOrCreateConversation)
       const returnedConvId = res.headers()["x-conversation-id"];
