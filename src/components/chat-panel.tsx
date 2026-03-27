@@ -7,12 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, Send, Loader2, MessageSquare, AlertCircle } from "lucide-react";
 import { useChat } from "@/hooks/use-chat";
 import type { SuggestedAction } from "@/types/chat";
-import type { GenerationOutput } from "@/types/generation";
 import { ActionConfirmModal } from "@/components/action-confirm-modal";
 
 interface ChatPanelProps {
   runId: string;
-  generation: GenerationOutput;
   onActionTriggered?: () => void;
 }
 
@@ -23,7 +21,7 @@ const ACTION_LABELS: Record<SuggestedAction["type"], string> = {
   recontent: "Re-generate content",
 };
 
-export function ChatPanel({ runId, generation }: ChatPanelProps) {
+export function ChatPanel({ runId, onActionTriggered }: ChatPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [input, setInput] = useState("");
   const [pendingAction, setPendingAction] = useState<{ action: SuggestedAction; messageIndex: number } | null>(null);
@@ -60,6 +58,7 @@ export function ChatPanel({ runId, generation }: ChatPanelProps) {
     if (!pendingAction) return;
     setPendingAction(null);
     await confirmAction(pendingAction.action, pendingAction.messageIndex);
+    onActionTriggered?.();
   };
 
   return (

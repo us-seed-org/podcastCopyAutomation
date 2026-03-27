@@ -6,46 +6,23 @@ export async function checkRateLimit(
   windowMs: number
 ): Promise<boolean> {
   if (!supabase) {
-    // DB not configured — fail open
+    console.debug("[rate-limit] DB not configured — allowing");
     return true;
   }
 
   const now = Date.now();
   const windowStart = Math.floor(now / windowMs) * windowMs;
 
-  // Step 1: Upsert the row with count = 1 (creates if missing, no-op if exists)
-  await supabase
-    .from("rate_limits")
-    .upsert(
-      { key, window_start: windowStart, count: 1 },
-      { onConflict: "key,window_start" }
-    );
+  const { data: currentCount, error } = await supabase.rpc(
+    "check_and_increment_rate_limit",
+    { p_key: key, p_window_start: windowStart }
+  );
 
-  // Step 2: Read current count
-  const { data } = await supabase
-    .from("rate_limits")
-    .select("count")
-    .eq("key", key)
-    .eq("window_start", windowStart)
-    .single();
-
-  if (!data) {
-    // Row vanished or DB error — fail open
-    return true;
+  if (error) {
+    console.error("[rate-limit] RPC error:", error);
+    return true; // fail open
   }
 
-  if (data.count > limit) {
-    return false; // over limit
-  }
-
-  // Step 3: Atomically increment
-  await supabase
-    .from("rate_limits")
-    .update({ count: data.count + 1 })
-    .eq("key", key)
-    .eq("window_start", windowStart);
-
-  // Step 4: If we just bumped over the limit, the NEXT request will be rejected
-  // (slightly permissive but prevents any race on the allow side)
-  return true;
+  console.debug(`[rate-limit] key=${key} count=${currentCount} limit=${limit}`);
+  return (currentCount as number) <= limit;
 }

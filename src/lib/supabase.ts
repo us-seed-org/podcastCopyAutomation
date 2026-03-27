@@ -74,7 +74,7 @@ export async function appendConversationMessage(
       p_message: message,
     });
     if (error) {
-      console.warn("[DB] Failed to append conversation message:", error.message);
+      console.debug("[DB] append_conversation_message result:", error?.message ?? "ok");
     }
   } catch (err) {
     console.warn("[DB] Error in appendConversationMessage:", err);

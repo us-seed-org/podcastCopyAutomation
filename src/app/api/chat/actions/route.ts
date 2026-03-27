@@ -17,7 +17,9 @@ export async function POST(request: Request) {
   const realIp = request.headers.get("x-real-ip");
   const forwarded = request.headers.get("x-forwarded-for");
   const ip = realIp
-    ? (forwarded ? forwarded.split(",")[0].trim() : null) || realIp
+    ? realIp
+    : forwarded
+    ? forwarded.split(",")[0].trim()
     : "anonymous";
   if (!(await checkRateLimit(`chat-action:${ip}`, 5, 3_600_000))) {
     return Response.json({ error: "Action rate limit exceeded. Try again later." }, { status: 429 });
@@ -151,11 +153,14 @@ export async function POST(request: Request) {
   // Execute asynchronously
   (async () => {
     try {
+      console.debug(`[chat-action:${actionId}] Starting generate call`);
       const res = await fetch(`${baseUrl}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(generatePayload),
       });
+
+      console.debug(`[chat-action:${actionId}] Generate fetch completed with status ${res.status}`);
 
       if (!res.ok) {
         throw new Error(`Generate returned ${res.status}`);
@@ -170,16 +175,19 @@ export async function POST(request: Request) {
             if (done) break;
           }
         } catch (readErr) {
+          console.debug(`[chat-action:${actionId}] Stream drain error:`, readErr);
           reader.cancel().catch(() => undefined);
           throw readErr;
         }
       }
 
+      console.debug(`[chat-action:${actionId}] Stream drained, updating DB to completed`);
       await sb
         .from("conversation_actions")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", actionId);
     } catch (err) {
+      console.debug(`[chat-action:${actionId}] Action failed, updating DB to failed:`, err instanceof Error ? err.message : String(err));
       await sb
         .from("conversation_actions")
         .update({

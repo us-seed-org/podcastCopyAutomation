@@ -315,7 +315,6 @@ export function ResultsDashboard({
       {runId && (
         <ChatPanel
           runId={runId}
-          generation={data}
           onActionTriggered={onRegenerate}
         />
       )}

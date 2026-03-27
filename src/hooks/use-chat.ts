@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import type { ChatMessage, Conversation, SuggestedAction } from "@/types/chat";
+import type { ChatMessage, SuggestedAction } from "@/types/chat";
 
 interface UseChatOptions {
   runId: string | null;
