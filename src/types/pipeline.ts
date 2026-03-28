@@ -18,6 +18,7 @@ export interface PipelineState {
   isRegenerating: boolean;
   traceEntries: PipelineTraceEntry[];
   pipelineSummary: PipelineSummary | null;
+  channelConfigId?: string;
 }
 
 export interface FormInput {
@@ -29,6 +30,7 @@ export interface FormInput {
   coHosts?: string;
   youtubeChannelUrl?: string;
   targetAudience?: string;
+  channelConfigId?: string;
 }
 
 export type PipelineAction =

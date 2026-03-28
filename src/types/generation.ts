@@ -98,4 +98,5 @@ export interface GenerationRequestPayload {
   mode?: GenerationMode;
   existingGeneration?: GenerationOutput;
   targetArchetype?: TitleArchetype;
+  channelConfigId?: string;
 }

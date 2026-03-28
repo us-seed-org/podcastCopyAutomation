@@ -133,7 +133,7 @@ src/
 | `NVIDIA_API_KEY` | — | Enables Kimi model via Nvidia |
 | `GENERATION_MODEL` | `gemini-3.0-flash` | Primary generation model |
 | `GEMINI_GENERATION_MODEL` | `gemini-3.1-pro-preview` | Premium Gemini generation |
-| `MINIMAX_GENERATION_MODEL` | `minimax-m2.5` | Minimax generation model |
+| `MINIMAX_GENERATION_MODEL` | `minimax-m2.7` | Minimax generation model |
 | `KIMI_MODEL` | `kimi-k2.5` | Kimi generation model |
 | `SCORING_MODEL` | `gpt-5.2` | Primary scorer |
 | `GEMINI_SCORING_MODEL` | `gemini-3.1-pro-preview` | Secondary scorer (dual-panel) |

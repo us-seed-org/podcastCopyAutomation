@@ -63,7 +63,7 @@ const BASE_OUTPUT = {
       thumbnailTextScore: THUMB_TEMPLATE,
       archetype: "curiosity_gap",
       thumbnailArchetype: "gut_punch",
-      sourceModel: "Minimax M2.5",
+      sourceModel: "Minimax M2.7",
       pairwiseWins: 2,
       pairwiseRank: 3,
       titleResultId: "yt-3",

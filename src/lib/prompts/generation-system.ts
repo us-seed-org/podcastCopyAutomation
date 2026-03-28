@@ -1,7 +1,48 @@
 import { SCORING_RUBRIC } from "./scoring-rubric";
+import type { ChannelConfig } from "@/types/channel-config";
 
-export function buildGenerationSystemPrompt(): string {
-  return `You are an elite podcast copy generator. You create YouTube titles, Spotify titles, descriptions, and chapter titles that MAXIMIZE click-through rates and discoverability.
+function sanitizeForPrompt(text: string, maxLen: number): string {
+  return text
+    .replace(/\r\n/g, "\n")         // normalize CRLF
+    .replace(/`/g, "'")
+    .replace(/#{3,}/g, "##")         // cap heading depth
+    .replace(/^---+$/gm, "")         // strip standalone HR separators
+    .replace(/\n{3,}/g, "\n\n")      // collapse excessive blank lines
+    .slice(0, maxLen);
+}
+
+function buildChannelContextSection(channel: ChannelConfig): string {
+  const lines: string[] = [
+    "## CHANNEL CONTEXT",
+    "",
+    channel.system_prompt ? sanitizeForPrompt(channel.system_prompt, 4000) : "",
+  ];
+
+  const { tone, style, personality } = channel.voice_guidelines || {};
+  if (tone || style || personality) {
+    lines.push("", "### Voice Guidelines");
+    if (tone) lines.push(`- Tone: ${sanitizeForPrompt(tone, 200)}`);
+    if (style) lines.push(`- Style: ${sanitizeForPrompt(style, 200)}`);
+    if (personality) lines.push(`- Personality: ${sanitizeForPrompt(personality, 200)}`);
+  }
+
+  if (channel.banned_phrases?.length) {
+    lines.push("", "### Additional Banned Phrases (channel-specific)");
+    lines.push(channel.banned_phrases.slice(0, 20).map(p => `- "${sanitizeForPrompt(p, 100)}"`).join("\n"));
+  }
+
+  if (channel.preferred_archetypes?.length) {
+    lines.push("", "### Preferred Archetypes for This Channel");
+    lines.push(channel.preferred_archetypes.slice(0, 4).join(", "));
+  }
+
+  lines.push("", "---", "");
+  return lines.join("\n");
+}
+
+export function buildGenerationSystemPrompt(channelContext?: ChannelConfig | null): string {
+  const channelSection = channelContext ? buildChannelContextSection(channelContext) : "";
+  return `${channelSection}You are an elite podcast copy generator. You create YouTube titles, Spotify titles, descriptions, and chapter titles that MAXIMIZE click-through rates and discoverability.
 
 You will receive:
 1. Research intelligence about the guest, podcast, and transcript
