@@ -1204,7 +1204,7 @@ if (mode === "rescore") {
           const models: GenerationModelConfig[] = [
             { model: geminiGenerationModel() ?? generationModel(), name: geminiGenerationModel() ? "Gemini 3.1 Pro" : "Gemini 3.0 Flash" },
             { model: generationModel(), name: "GPT-5.2" },
-            { model: minimaxGenerationModel(), name: "Minimax M2.5" },
+            { model: minimaxGenerationModel(), name: "Minimax M2.7" },
           ];
           const kimi = kimiModel();
           if (kimi) {
