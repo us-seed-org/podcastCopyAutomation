@@ -11,7 +11,6 @@ import { ActionConfirmModal } from "@/components/action-confirm-modal";
 
 interface ChatPanelProps {
   runId: string;
-  onActionTriggered?: () => void;
 }
 
 const ACTION_LABELS: Record<SuggestedAction["type"], string> = {
@@ -21,7 +20,7 @@ const ACTION_LABELS: Record<SuggestedAction["type"], string> = {
   recontent: "Re-generate content",
 };
 
-export function ChatPanel({ runId, onActionTriggered }: ChatPanelProps) {
+export function ChatPanel({ runId }: ChatPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [input, setInput] = useState("");
   const [pendingAction, setPendingAction] = useState<{ action: SuggestedAction; messageIndex: number } | null>(null);
@@ -58,7 +57,6 @@ export function ChatPanel({ runId, onActionTriggered }: ChatPanelProps) {
     if (!pendingAction) return;
     setPendingAction(null);
     await confirmAction(pendingAction.action, pendingAction.messageIndex);
-    onActionTriggered?.();
   };
 
   return (

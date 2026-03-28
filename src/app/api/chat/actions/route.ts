@@ -101,6 +101,9 @@ export async function POST(request: Request) {
     .single();
 
   if (insertErr || !actionRow) {
+    if (insertErr?.code === "23505") {
+      return Response.json({ error: "An action is already in progress for this conversation" }, { status: 409 });
+    }
     return Response.json({ error: "Failed to create action record" }, { status: 500 });
   }
 
@@ -166,19 +169,29 @@ export async function POST(request: Request) {
         throw new Error(`Generate returned ${res.status}`);
       }
 
-      // Drain the stream
+      // Drain the stream, checking for error events
       const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let hasError = false;
       if (reader) {
         try {
           while (true) {
-            const { done } = await reader.read();
+            const { done, value } = await reader.read();
             if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            if (text.includes('"type":"error"')) {
+              hasError = true;
+            }
           }
         } catch (readErr) {
           console.debug(`[chat-action:${actionId}] Stream drain error:`, readErr);
           reader.cancel().catch(() => undefined);
           throw readErr;
         }
+      }
+
+      if (hasError) {
+        throw new Error("Generation pipeline emitted error event");
       }
 
       console.debug(`[chat-action:${actionId}] Stream drained, updating DB to completed`);

@@ -313,10 +313,7 @@ export function ResultsDashboard({
       </Tabs>
 
       {runId && (
-        <ChatPanel
-          runId={runId}
-          onActionTriggered={onRegenerate}
-        />
+        <ChatPanel runId={runId} />
       )}
     </div>
   );

@@ -75,6 +75,9 @@ export async function PUT(
     .single();
 
   if (error || !data) {
+    if (error?.code === "23505") {
+      return Response.json({ error: "A config with this name already exists" }, { status: 409 });
+    }
     return Response.json({ error: error?.message || "Not found" }, { status: 404 });
   }
   return Response.json({ data });
