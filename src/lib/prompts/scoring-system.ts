@@ -134,6 +134,7 @@ NOTE: YouTube titles include thumbnailText and thumbnailTextScore. Spotify title
 export function buildScoringUserPrompt(input: {
   generatedTitles: string;
   research: string;
+  feedbackContext?: string;
 }): string {
   if (typeof input.generatedTitles !== 'string' || input.generatedTitles.trim().length === 0) {
     throw new Error('buildScoringUserPrompt: input.generatedTitles must be a non-empty string');
@@ -142,13 +143,17 @@ export function buildScoringUserPrompt(input: {
     throw new Error('buildScoringUserPrompt: input.research must be a non-empty string');
   }
 
+  const feedbackSection = input.feedbackContext?.trim()
+    ? `\n## FEEDBACK CONTEXT\n${input.feedbackContext.trim()}\n`
+    : "";
+
   return `## GENERATED TITLES
 
 ${input.generatedTitles.trim()}
 
 ## RESEARCH INTELLIGENCE
 
-${input.research.trim()}
+${input.research.trim()}${feedbackSection}
 
 Now evaluate these titles AND their thumbnail text. Follow the MANDATORY SCORING PROCESS for each title.
 

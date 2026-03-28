@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TranscriptUpload } from "@/components/transcript-upload";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import Link from "next/link";
 import type { ParsedTranscript } from "@/lib/transcript-parser";
 import type { FormInput } from "@/types/pipeline";
+import type { ChannelConfig } from "@/types/channel-config";
 import { truncateTranscript } from "@/lib/transcript-parser";
 
 interface InputFormProps {
@@ -28,6 +31,15 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [channelConfigs, setChannelConfigs] = useState<ChannelConfig[]>([]);
+  const [selectedChannelConfigId, setSelectedChannelConfigId] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/channel-configs")
+      .then((r) => r.json())
+      .then(({ data }) => setChannelConfigs(data || []))
+      .catch(() => {});
+  }, []);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -55,6 +67,7 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
       coHosts: coHosts.trim() || undefined,
       youtubeChannelUrl: youtubeChannelUrl.trim() || undefined,
       targetAudience: targetAudience.trim() || undefined,
+      channelConfigId: selectedChannelConfigId || undefined,
     });
   };
 
@@ -131,6 +144,33 @@ export function InputForm({ onSubmit, isLoading }: InputFormProps) {
               <p className="text-sm text-destructive">{errors.episodeDescription}</p>
             )}
           </div>
+
+          {channelConfigs.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="channelConfig">Channel Config</Label>
+                <Link href="/channel-configs" className="text-xs text-muted-foreground hover:underline">
+                  Manage configs
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  id="channelConfig"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={selectedChannelConfigId}
+                  onChange={(e) => setSelectedChannelConfigId(e.target.value)}
+                >
+                  <option value="">None (default prompt)</option>
+                  {channelConfigs.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {selectedChannelConfigId && (
+                  <Badge variant="secondary" className="shrink-0">Custom context active</Badge>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <button

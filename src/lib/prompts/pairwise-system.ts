@@ -33,13 +33,18 @@ export function buildPairwiseUserPrompt(input: {
   thumbnailTextA: string;
   titleB: string;
   thumbnailTextB: string;
+  feedbackContext?: string;
 }): string {
   const desc = String(input.episodeDescription || '');
   const truncated = desc.slice(0, 500);
   const truncatedDesc = desc.length > 500 ? truncated + " [TRUNCATED]" : truncated;
 
+  const feedbackSection = input.feedbackContext?.trim()
+    ? `\n## FEEDBACK CONTEXT\n${input.feedbackContext.trim()}\n`
+    : "";
+
   return `## EPISODE DESCRIPTION
-${truncatedDesc}
+${truncatedDesc}${feedbackSection}
 
 ## TITLE A (with thumbnail text)
 Title: ${input.titleA}
