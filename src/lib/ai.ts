@@ -79,7 +79,7 @@ export const researchModel = (model?: string) =>
 export const generationModel = (model?: string) =>
   selectModel(model || process.env.GENERATION_MODEL || "gemini-3.0-flash");
 export const minimaxGenerationModel = (model?: string) =>
-  getMinimaxProvider()(model || process.env.MINIMAX_GENERATION_MODEL || "minimax-m2.5");
+  getMinimaxProvider()(model || process.env.MINIMAX_GENERATION_MODEL || "minimax-m2.7");
 export const kimiModel = (model?: string) => {
   const provider = getNvidiaProvider();
   return provider ? provider(model || process.env.KIMI_MODEL || "kimi-k2.5") : null;
